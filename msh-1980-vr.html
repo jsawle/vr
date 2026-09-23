@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<title>Mount St Helens 1980 in VR</title>
+<meta name="description" content="Tabletop 3D and VR model of Mount St Helens with the four hazards of 18 May 1980 (debris avalanche, lateral blast, pyroclastic flows, lahars), for grades 6-8. Works in a browser and on Meta Quest with passthrough." />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+  "lerc": "https://cdn.jsdelivr.net/npm/lerc@4.2.0/LercDecode.es.js"
+} }
+</script>
+<style>
+  :root { --panel: rgba(255,253,248,.94); --ink: #22201c; --muted: #6b665c; --rule: #ddd6c8; --accent: #b4381c; --chip: #efe9dd; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #e0643f; --chip: #2b2823; } }
+  :root[data-theme="dark"] { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #e0643f; --chip: #2b2823; }
+  html, body { margin: 0; height: 100%; background: #1c1b19; color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  canvas#three { display: block; width: 100%; height: 100%; touch-action: none; }
+  #ui { position: absolute; left: 12px; top: 12px; width: 300px; max-width: calc(100% - 24px); background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+  #ui h1 { font-size: 17px; margin: 0 0 2px; }
+  #ui .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); text-align: left; }
+  button .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+  button[aria-pressed="true"] { outline: 2px solid var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  select { font: inherit; font-size: 13.5px; width: 100%; padding: 6px; border-radius: 8px; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); margin-top: 6px; }
+  #info { margin-top: 10px; font-size: 13.5px; min-height: 2.8em; }
+  #clock { font-weight: 700; font-variant-numeric: tabular-nums; }
+  #credits { position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: #d8d2c6; text-shadow: 0 1px 2px #000; max-width: 60%; text-align: right; }
+  #xr { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; }
+  #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
+    background: var(--accent) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
+  #xr button[disabled], #xr a { display: none; }
+  #toggleUI { display: none; }
+  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; } #ui .sub { display: none; } #credits { max-width: 90%; } }
+</style>
+</head>
+<body>
+<canvas id="three"></canvas>
+<div id="ui">
+  <h1>Mount St Helens, 18 May 1980</h1>
+  <div class="sub">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
+  <div class="grid">
+    <button data-h="aval"><span class="sw" style="background:#8a5a2b"></span>1 Avalanche</button>
+    <button data-h="blast"><span class="sw" style="background:#6d28d9"></span>2 Blast</button>
+    <button data-h="pf"><span class="sw" style="background:#dc2626"></span>3 Pyroclastic flows</button>
+    <button data-h="lahar"><span class="sw" style="background:#0e7490"></span>4 Lahar</button>
+  </div>
+  <select id="valley" aria-label="Lahar valley">
+    <option value="nf">Lahar: North Fork Toutle</option><option value="sf">Lahar: South Fork Toutle</option>
+    <option value="pine">Lahar: Pine Creek</option><option value="muddy">Lahar: Muddy River</option>
+  </select>
+  <div class="grid" style="margin-top:6px">
+    <button id="ground">Ground: today</button>
+    <button id="clear">Clear</button>
+  </div>
+  <div id="info">Loading the mountain…</div>
+</div>
+<div id="xr"></div>
+<div id="credits"></div>
+
+<script>
+/* Volcanic hazard models for classroom use. Version 1.4 (23 September 2026).
+   1. Energy cone (Malin & Sheridan 1982) for pyroclastic density currents and, as an
+      approximation, a lateral blast limited to a sector. A current starts at height H above
+      the vent and its "energy line" drops by k (= H/L) metres per metre travelled. It can
+      reach a spot if the energy line stays above the ground all the way from the vent.
+   2. LAHARZ (Iverson, Schilling & Vallance 1998; Griswold & Iverson 2008) for lahars and
+      debris avalanches. From volume V: valley cross-section filled A = a1·V^(2/3),
+      total area flooded B = a2·V^(2/3). Walk down the river network, filling each valley
+      cross-section to area A, until the flooded area reaches B.
+   Grids: row-major Float32Array heights (m), NaN = no data, j increases southward. */
+(function (root) {
+  "use strict";
+  const DI = [-1, 0, 1, -1, 1, -1, 0, 1];
+  const DJ = [-1, -1, -1, 0, 0, 1, 1, 1];
+  const DD = [Math.SQRT2, 1, Math.SQRT2, 1, 1, Math.SQRT2, 1, Math.SQRT2];
+
+  // ---------- binary min-heap on typed arrays ----------
+  function Heap(cap) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
+  Heap.prototype.push = function (key, val) {
+    let i = this.n++; const K = this.k, V = this.v;
+    while (i > 0) { const p = (i - 1) >> 1; if (K[p] <= key) break; K[i] = K[p]; V[i] = V[p]; i = p; }
+    K[i] = key; V[i] = val;
+  };
+  Heap.prototype.pop = function () {
+    const K = this.k, V = this.v, top = V[0]; this.lastKey = K[0];
+    const n = --this.n; if (n === 0) return top;
+    const key = K[n], val = V[n]; let i = 0;
+    for (;;) {
+      let c = 2 * i + 1; if (c >= n) break;
+      if (c + 1 < n && K[c + 1] < K[c]) c++;
+      if (K[c] >= key) break;
+      K[i] = K[c]; V[i] = V[c]; i = c;
+    }
+    K[i] = key; V[i] = val; return top;
+  };
+
+  /* River network: priority-flood depression filling (with a tiny gradient so flats drain),
+     steepest-descent (D8) directions on the filled surface, and upstream cell counts.
+     Cells with h <= seaLevel or on the grid edge are outlets. */
+  function flowNetwork(h, w, ht, seaLevel) {
+    seaLevel = seaLevel == null ? 0 : seaLevel;
+    const N = w * ht, filled = new Float64Array(N).fill(NaN), done = new Uint8Array(N);
+    const heap = new Heap(N), order = new Int32Array(N); let no = 0;
+    const EPS = 1e-3;
+    for (let c = 0; c < N; c++) {
+      if (!isFinite(h[c])) continue;
+      const i = c % w, j = (c / w) | 0;
+      let edge = i === 0 || j === 0 || i === w - 1 || j === ht - 1 || h[c] <= seaLevel;
+      if (!edge) for (let k = 0; k < 8; k++) { if (!isFinite(h[(j + DJ[k]) * w + i + DI[k]])) { edge = true; break; } }
+      if (edge) { filled[c] = h[c]; done[c] = 1; heap.push(h[c], c); }
+    }
+    while (heap.n) {
+      const c = heap.pop(); order[no++] = c;
+      const i = c % w, j = (c / w) | 0, fc = filled[c];
+      for (let k = 0; k < 8; k++) {
+        const ni = i + DI[k], nj = j + DJ[k];
+        if (ni < 0 || nj < 0 || ni >= w || nj >= ht) continue;
+        const n = nj * w + ni;
+        if (done[n] || !isFinite(h[n])) continue;
+        done[n] = 1; filled[n] = Math.max(h[n], fc + EPS); heap.push(filled[n], n);
+      }
+    }
+    const dir = new Int8Array(N).fill(-1);
+    for (let c = 0; c < N; c++) {
+      if (!done[c]) continue;
+      const i = c % w, j = (c / w) | 0; let best = -1, bs = 0;
+      for (let k = 0; k < 8; k++) {
+        const ni = i + DI[k], nj = j + DJ[k];
+        if (ni < 0 || nj < 0 || ni >= w || nj >= ht) continue;
+        const n = nj * w + ni; if (!done[n]) continue;
+        const s = (filled[c] - filled[n]) / DD[k];
+        if (s > bs) { bs = s; best = k; }
+      }
+      dir[c] = best;
+    }
+    const acc = new Int32Array(N);
+    for (let q = no - 1; q >= 0; q--) {           // reverse flood order is upstream-first
+      const c = order[q]; acc[c] += 1;
+      const k = dir[c]; if (k < 0) continue;
+      acc[(((c / w) | 0) + DJ[k]) * w + (c % w) + DI[k]] += acc[c];
+    }
+    return { filled, dir, acc };
+  }
+
+  // The cell within radius with the largest upstream area (the main river there), if it has at least minCells.
+  function snapToChannel(net, w, ht, idx, minCells, radiusCells) {
+    const ci = idx % w, cj = (idx / w) | 0; let best = -1, ba = minCells - 1;
+    for (let dj = -radiusCells; dj <= radiusCells; dj++) for (let di = -radiusCells; di <= radiusCells; di++) {
+      const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= w || j >= ht) continue;
+      const c = j * w + i;
+      if (di * di + dj * dj <= radiusCells * radiusCells && net.acc[c] > ba) { ba = net.acc[c]; best = c; }
+    }
+    return best;
+  }
+
+  /* LAHARZ (Iverson, Schilling & Vallance 1998). A (m²) cross-section, B (m²) planimetric area, cell = true cell size (m).
+     As published: at each stream cell, three valley cross-sections at 45° intervals (perpendicular to the flow and
+     ±45°), each filled to area A; the flow stops when the flooded area reaches B.
+     opts.proximal = {apex: idx, k: H/L}: no cross-sections while the path is inside the proximal hazard zone (the
+     ground lies below an energy cone from the summit); valley-filling starts where the path leaves it.
+     onCell(idx, distanceAlongPath). Returns {path, pathDist, area, length, reason, flooded, level, surface, distOf, proximalExit}.
+     level[idx] = highest fill level of the cross-sections that flooded the cell; surface[idx] = that level smoothed
+     along the valley and across neighbours (for drawing only; never below the ground). */
+  const RING = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  function ringIndex(di, dj) { for (let r = 0; r < 8; r++) if (RING[r][0] === di && RING[r][1] === dj) return r; return 0; }
+  function laharz(h, net, w, ht, cell, start, A, B, onCell, opts) {
+    opts = opts || {};
+    const maxHalf = opts.maxHalfWidthCells || 400;
+    const N = w * ht, flooded = new Uint8Array(N); let nFlooded = 0;
+    const level = new Float32Array(N).fill(NaN), owner = new Int32Array(N).fill(-1), distOf = new Float32Array(N).fill(NaN);
+    const cellArea = cell * cell, path = [], pathDist = [], pathL = [];
+    let c = start, dist = 0, reason = "area", prevK = 4, Lcur = 0, active = !opts.proximal, proximalExit = active ? 0 : -1;
+    const P = opts.proximal;
+    const inProx = (q) => { if (!P) return false; const ai = P.apex % w, aj = (P.apex / w) | 0, qi = q % w, qj = (q / w) | 0;
+      const d = Math.hypot(qi - ai, qj - aj) * cell; return h[q] < h[P.apex] - P.k * d; };
+    const mark = (q, d) => { if (!flooded[q]) { flooded[q] = 1; nFlooded++; level[q] = Lcur; owner[q] = path.length - 1; distOf[q] = d; onCell(q, d); }
+      else if (Lcur > level[q]) { level[q] = Lcur; owner[q] = path.length - 1; } };  // where sections overlap, the flow surface is the highest
+    for (let guard = 0; guard < N; guard++) {
+      path.push(c); pathDist.push(dist); pathL.push(NaN);
+      const k = net.dir[c], i = c % w, j = (c / w) | 0, zc = h[c];
+      if (!active && !inProx(c)) { active = true; proximalExit = path.length - 1; }
+      if (active) {
+        const kk = k >= 0 ? k : prevK, r0 = ringIndex(DI[kk], DJ[kk]);
+        for (const rot of [2, 1, 3]) {                    // perpendicular, then ±45°
+          const [px, py] = RING[(r0 + rot) % 8], step = cell * Math.hypot(px, py);
+          const profile = (sgn) => { const z = []; for (let n = 1; n <= maxHalf; n++) {
+            const ni = i + sgn * n * px, nj = j + sgn * n * py;
+            if (ni < 0 || nj < 0 || ni >= w || nj >= ht) break; const v = h[nj * w + ni]; if (!isFinite(v)) break; z.push(v);
+          } return z; };
+          const left = profile(1), right = profile(-1);
+          const areaAt = (L) => { let a = Math.max(0, L - zc) * step;
+            for (const side of [left, right]) for (const z of side) { if (z >= L) break; a += (L - z) * step; } return a; };
+          let lo = zc, hi = zc + 50;
+          while (areaAt(hi) < A && hi - zc < 3000) hi = zc + (hi - zc) * 2;
+          for (let it = 0; it < 40; it++) { const mid = (lo + hi) / 2; if (areaAt(mid) < A) lo = mid; else hi = mid; }
+          Lcur = hi; if (rot === 2) pathL[path.length - 1] = hi;
+          mark(c, dist);
+          for (const [side, sgn] of [[left, 1], [right, -1]])
+            for (let n = 0; n < side.length; n++) {
+              if (side[n] >= Lcur) break;
+              // diagonal sections step corner to corner: also flood the square in between, so the section is continuous
+              if (px && py) { const bi = i + sgn * (n + 1) * px, bj = j + sgn * n * py, bq = bj * w + bi;
+                if (bi >= 0 && bj >= 0 && bi < w && bj < ht && h[bq] < Lcur) mark(bq, dist); }
+              mark((j + sgn * (n + 1) * py) * w + i + sgn * (n + 1) * px, dist);
+            }
+        }
+        if (nFlooded * cellArea >= B) { reason = "area"; break; }
+      }
+      if (k < 0) { reason = "edge"; break; }
+      if (opts.seaLevel != null && zc <= opts.seaLevel) { reason = "sea"; break; }
+      prevK = k; dist += DD[k] * cell; c = (j + DJ[k]) * w + i + DI[k];
+    }
+    // Smoothed surface for drawing: fill level averaged along the valley (±10 cells), then across flooded neighbours.
+    const n = path.length, Ls = new Float32Array(n);
+    for (let p = 0; p < n; p++) { let s = 0, m = 0; for (let q = Math.max(0, p - 10); q <= Math.min(n - 1, p + 10); q++) if (isFinite(pathL[q])) { s += pathL[q]; m++; } Ls[p] = m ? s / m : h[path[p]]; }
+    let surface = new Float32Array(N).fill(NaN);
+    for (let q = 0; q < N; q++) if (flooded[q]) surface[q] = Math.max(Ls[owner[q]], h[q] + 0.5);
+    for (let pass = 0; pass < 3; pass++) {
+      const next = Float32Array.from(surface);
+      for (let q = 0; q < N; q++) {
+        if (!flooded[q]) continue; const qi = q % w, qj = (q / w) | 0; let s = surface[q], m = 1;
+        for (let kx = 0; kx < 8; kx++) { const ni = qi + DI[kx], nj = qj + DJ[kx]; if (ni < 0 || nj < 0 || ni >= w || nj >= ht) continue;
+          const nb = nj * w + ni; if (flooded[nb]) { s += surface[nb]; m++; } }
+        next[q] = Math.max(s / m, h[q] + 0.5);
+      }
+      surface = next;
+    }
+    return { path, pathDist, area: nFlooded * cellArea, length: dist, reason, flooded, level, surface, distOf, proximalExit };
+  }
+
+  /* For drawing only: remove one-cell spikes and hairlines (cells with <= 2 flooded neighbours) and fill
+     small holes (dry cells with >= 5 flooded neighbours); spikes are cells with <= 3 flooded neighbours. Returns {mask, surface}; the model's area is unchanged. */
+  function cleanForDisplay(flooded, surface, h, w, ht, passes) {
+    let m = Uint8Array.from(flooded), s = Float32Array.from(surface);
+    const nbrs = (q) => { const i = q % w, j = (q / w) | 0; let n = 0, sum = 0;
+      for (let k = 0; k < 8; k++) { const ni = i + DI[k], nj = j + DJ[k]; if (ni < 0 || nj < 0 || ni >= w || nj >= ht) continue;
+        const b = nj * w + ni; if (m[b]) { n++; sum += s[b]; } } return [n, sum]; };
+    for (let p = 0; p < (passes || 2); p++) {
+      const add = [], del = [];
+      for (let q = 0; q < w * ht; q++) {
+        const i = q % w, j = (q / w) | 0; if (i === 0 || j === 0 || i === w - 1 || j === ht - 1) continue;
+        const [n, sum] = nbrs(q);
+        if (m[q] && n <= 3) del.push(q);
+        else if (!m[q] && n >= 5 && isFinite(h[q])) add.push([q, Math.max(sum / n, h[q] + 0.5)]);
+      }
+      for (const q of del) m[q] = 0;
+      for (const [q, z] of add) { m[q] = 1; s[q] = z; }
+    }
+    return { mask: m, surface: s };
+  }
+
+  // Highest cell within radius (cells) of idx: the summit for the proximal hazard zone.
+  function highestNear(h, w, ht, idx, radius) {
+    const ci = idx % w, cj = (idx / w) | 0; let best = idx, bz = -Infinity;
+    for (let dj = -radius; dj <= radius; dj++) for (let di = -radius; di <= radius; di++) {
+      const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= w || j >= ht || di * di + dj * dj > radius * radius) continue;
+      const c = j * w + i; if (h[c] > bz) { bz = h[c]; best = c; } }
+    return best;
+  }
+
+  /* Energy cone with topographic blocking. vent idx, H (m above vent ground), k = H/L.
+     sector: {center: deg from north clockwise, half: half-angle deg} or null for all directions.
+     onCell(idx, distance m). Returns {reached:Uint8Array, maxDist}. */
+  function energyCone(h, w, ht, cell, vent, H, k, sector, onCell) {
+    const vi = vent % w, vj = (vent / w) | 0, z0 = h[vent] + H;
+    let zmin = Infinity; for (let c = 0; c < h.length; c++) if (h[c] < zmin) zmin = h[c];
+    const Rcells = Math.min(Math.ceil((z0 - zmin) / k / cell) + 2, Math.max(w, ht));
+    const reached = new Uint8Array(w * ht); let maxDist = 0;
+    // Sector limit. With sector.taper (degrees), mobility falls off beyond the edge instead of stopping at a straight line:
+    // k rises smoothly from k to sector.kEdge over the taper, so the margin curves and follows the ground.
+    const kOf = (ang) => { if (!sector) return k; const d = Math.abs(((ang - sector.center) % 360 + 540) % 360 - 180);
+      if (d <= sector.half) return k; const tp = sector.taper || 0; if (d > sector.half + tp) return -1;
+      const t = (d - sector.half) / tp; return k + ((sector.kEdge || 0.5) - k) * t * t; };
+    const hit = (c, d) => { if (!reached[c]) { reached[c] = 1; if (onCell) onCell(c, d); } if (d > maxDist) maxDist = d; };
+    hit(vent, 0);
+    // one ray to every cell on the square perimeter at radius Rcells: every cell inside is crossed by some ray
+    const targets = [];
+    for (let t = -Rcells; t <= Rcells; t++) { targets.push([t, -Rcells], [t, Rcells]); if (t > -Rcells && t < Rcells) targets.push([-Rcells, t], [Rcells, t]); }
+    for (const [ti, tj] of targets) {
+      const ang = (Math.atan2(ti, -tj) * 180 / Math.PI + 360) % 360;
+      const kr = kOf(ang); if (kr < 0) continue;
+      const len = Math.hypot(ti, tj), steps = Math.ceil(len * 2), dx = ti / steps, dy = tj / steps, ds = len / steps * cell;
+      for (let s = 1; s <= steps; s++) {
+        const i = Math.round(vi + dx * s), j = Math.round(vj + dy * s);
+        if (i < 0 || j < 0 || i >= w || j >= ht) break;
+        const c = j * w + i, z = h[c]; if (!isFinite(z)) break;
+        const d = s * ds, e = z0 - kr * d;
+        if (e < z) break;
+        hit(c, d);
+      }
+    }
+    return { reached, maxDist };
+  }
+
+  const api = { flowNetwork, snapToChannel, laharz, energyCone, highestNear, cleanForDisplay };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.HazardModels = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { ARButton } from "three/addons/webxr/ARButton.js";
+import { VRButton } from "three/addons/webxr/VRButton.js";
+import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
+
+const VERSION = "VR 0.2";
+document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
+document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
+const HM = window.HazardModels;
+const $ = (id) => document.getElementById(id);
+const info = (html) => { $("info").innerHTML = html; panelDirty = true; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); };
+
+// ---------------- Area and grids ----------------
+// Mount St Helens and the upper North Fork Toutle valley. Local metres: x east, y north (Three.js z = -y).
+const AREA = { lonMin: -122.50, lonMax: -122.05, latMin: 46.12, latMax: 46.34 };
+const LON0 = (AREA.lonMin + AREA.lonMax) / 2, LAT0 = (AREA.latMin + AREA.latMax) / 2;
+const KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 111132;
+const toXY = (lon, lat) => [(lon - LON0) * KX, (lat - LAT0) * KY];
+const toLL = (x, y) => [LON0 + x / KX, LAT0 + y / KY];
+const XMIN = (AREA.lonMin - LON0) * KX, XMAX = (AREA.lonMax - LON0) * KX, YMIN = (AREA.latMin - LAT0) * KY, YMAX = (AREA.latMax - LAT0) * KY;
+const CELL = 60;                                             // model grid (m)
+const W = Math.floor((XMAX - XMIN) / CELL), H = Math.floor((YMAX - YMIN) / CELL);
+const cellXY = (c) => [XMIN + (c % W + 0.5) * CELL, YMAX - (((c / W) | 0) + 0.5) * CELL];
+const idxOf = (lon, lat) => { const [x, y] = toXY(lon, lat); const i = Math.floor((x - XMIN) / CELL), j = Math.floor((YMAX - y) / CELL); return (i < 0 || j < 0 || i >= W || j >= H) ? -1 : j * W + i; };
+const RS = 2;                                                // render mesh: every 2nd grid cell (120 m)
+const RW = Math.floor(W / RS) + 1, RH = Math.floor(H / RS) + 1;
+const EXAG = 1.5;                                            // vertical exaggeration on the table
+
+// ---------------- Tiles (Web Mercator) ----------------
+const R = 6378137;
+const merc = (lon, lat) => [lon * Math.PI / 180 * R, R * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360))];
+const tileXY = (lon, lat, z) => { const n = 2 ** z; const x = (lon + 180) / 360 * n;
+  const lr = lat * Math.PI / 180, y = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n; return [x, y]; };
+function loadImage(url) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => rej(new Error("image " + url)); im.src = url; }); }
+
+// Elevation: Esri World Elevation (Terrain3D, LERC tiles), falling back to open Terrarium tiles.
+const ELEV_Z = 12;
+async function loadElevation(progress) {
+  const [x0f, y0f] = tileXY(AREA.lonMin, AREA.latMax, ELEV_Z), [x1f, y1f] = tileXY(AREA.lonMax, AREA.latMin, ELEV_Z);
+  const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
+  const tiles = new Map(), total = (tx1 - tx0 + 1) * (ty1 - ty0 + 1); let done = 0, esriOK = true, used = new Set();
+  let Lerc = null;
+  try { Lerc = await import("lerc"); await Lerc.load(); } catch (e) { console.warn("LERC decoder unavailable; using open terrain tiles", e); esriOK = false; }
+  const esriTile = async (tx, ty) => {
+    const r = await fetch(`https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/${ELEV_Z}/${ty}/${tx}`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const pb = Lerc.decode(await r.arrayBuffer());
+    return { w: pb.width, h: pb.height, v: pb.pixels[0], corner: pb.width === 257 };
+  };
+  const terrariumTile = async (tx, ty) => {
+    const im = await loadImage(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${ELEV_Z}/${tx}/${ty}.png`);
+    const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height;
+    const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(im, 0, 0);
+    const d = cx.getImageData(0, 0, im.width, im.height).data, v = new Float32Array(im.width * im.height);
+    for (let k = 0; k < v.length; k++) v[k] = d[4 * k] * 256 + d[4 * k + 1] + d[4 * k + 2] / 256 - 32768;
+    return { w: im.width, h: im.height, v, corner: false };
+  };
+  const jobs = [];
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) jobs.push((async () => {
+    let t = null;
+    if (esriOK) { try { t = await esriTile(tx, ty); used.add("esri"); } catch (e) { console.warn("Esri elevation tile failed; using open terrain tile", tx, ty, e.message); } }
+    if (!t) { t = await terrariumTile(tx, ty); used.add("terrarium"); }
+    tiles.set(tx + "," + ty, t); progress(++done / total);
+  })());
+  await Promise.all(jobs);
+  const source = used.has("terrarium") ? (used.has("esri") ? "mixed" : "terrarium") : "esri";
+  const at = (lon, lat) => {
+    const [fx, fy] = tileXY(lon, lat, ELEV_Z), tx = Math.floor(fx), ty = Math.floor(fy), t = tiles.get(tx + "," + ty);
+    if (!t) return NaN;
+    const u = fx - tx, v = fy - ty;
+    const px = t.corner ? u * (t.w - 1) : u * t.w - 0.5, py = t.corner ? v * (t.h - 1) : v * t.h - 0.5;
+    const i = Math.max(0, Math.min(t.w - 2, Math.floor(px))), j = Math.max(0, Math.min(t.h - 2, Math.floor(py)));
+    const a = Math.min(1, Math.max(0, px - i)), b = Math.min(1, Math.max(0, py - j)), q = j * t.w + i;
+    return t.v[q] * (1 - a) * (1 - b) + t.v[q + 1] * a * (1 - b) + t.v[q + t.w] * (1 - a) * b + t.v[q + t.w + 1] * a * b;
+  };
+  const h = new Float32Array(W * H);
+  for (let c = 0; c < W * H; c++) { const [lon, lat] = toLL(...cellXY(c)); h[c] = at(lon, lat); }
+  return { h, source };
+}
+
+// Imagery: Esri World Imagery tiles stitched into one texture.
+const IMG_Z = 13;
+async function loadImagery(progress) {
+  const [x0f, y0f] = tileXY(AREA.lonMin, AREA.latMax, IMG_Z), [x1f, y1f] = tileXY(AREA.lonMax, AREA.latMin, IMG_Z);
+  const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
+  const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256;
+  const cx = cv.getContext("2d"); cx.fillStyle = "#6b7a5a"; cx.fillRect(0, 0, cv.width, cv.height);
+  const jobs = []; let done = 0, total = (tx1 - tx0 + 1) * (ty1 - ty0 + 1);
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++)
+    jobs.push(loadImage(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${IMG_Z}/${ty}/${tx}`)
+      .then(im => cx.drawImage(im, (tx - tx0) * 256, (ty - ty0) * 256)).catch(() => {}).finally(() => progress(++done / total)));
+  await Promise.all(jobs);
+  const uvOf = (lon, lat) => { const [fx, fy] = tileXY(lon, lat, IMG_Z); return [(fx - tx0) / (tx1 - tx0 + 1), (fy - ty0) / (ty1 - ty0 + 1)]; };
+  return { canvas: cv, uvOf };
+}
+
+// Pre-1980 ground: USGS 1952 surface (msh-1952-dem.bin/json), blended into today's ground at its edges.
+async function loadPast(today) {
+  const [hdr, buf] = await Promise.all([fetch("msh-1952-dem.json").then(r => r.json()), fetch("msh-1952-dem.bin").then(r => r.arrayBuffer())]);
+  const raw = new Uint16Array(buf), n = hdr.W * hdr.H, z = new Float32Array(n), d = new Float32Array(n), Wd = hdr.W, Hd = hdr.H;
+  for (let i = 0; i < n; i++) { z[i] = raw[i] ? raw[i] * hdr.scale : NaN; d[i] = raw[i] ? 1e9 : 0; }
+  for (let j = 0; j < Hd; j++) for (let i = 0; i < Wd; i++) { const c = j * Wd + i; if (!d[c]) continue; let v = d[c];
+    if (i > 0) v = Math.min(v, d[c - 1] + 1); if (j > 0) v = Math.min(v, d[c - Wd] + 1); if (i === 0 || j === 0 || i === Wd - 1 || j === Hd - 1) v = Math.min(v, 1); d[c] = v; }
+  for (let j = Hd - 1; j >= 0; j--) for (let i = Wd - 1; i >= 0; i--) { const c = j * Wd + i; if (!d[c]) continue; let v = d[c];
+    if (i < Wd - 1) v = Math.min(v, d[c + 1] + 1); if (j < Hd - 1) v = Math.min(v, d[c + Wd] + 1); d[c] = v; }
+  const past = Float32Array.from(today);
+  for (let c = 0; c < W * H; c++) {
+    const [lon, lat] = toLL(...cellXY(c)), [mx, my] = merc(lon, lat);
+    const fx = (mx - hdr.xmin) / hdr.cellM - 0.5, fy = (hdr.ymax - my) / hdr.cellM - 0.5, i = Math.floor(fx), j = Math.floor(fy);
+    if (i < 0 || j < 0 || i >= Wd - 1 || j >= Hd - 1) continue;
+    const a = fx - i, b = fy - j, q = j * Wd + i, qs = [q, q + 1, q + Wd, q + Wd + 1], f = [(1 - a) * (1 - b), a * (1 - b), (1 - a) * b, a * b];
+    let zs = 0, ws = 0, bad = false; for (let k = 0; k < 4; k++) { if (isNaN(z[qs[k]])) { bad = true; break; } zs += z[qs[k]] * f[k]; ws += Math.min(1, d[qs[k]] / 20) * f[k]; }
+    if (!bad && isFinite(today[c])) past[c] = today[c] + ws * (zs - today[c]);
+  }
+  return past;
+}
+
+// ---------------- Three.js scene ----------------
+const canvas = $("three");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+const scene = new THREE.Scene();
+const bg = new THREE.Color(0x1c1b19); scene.background = bg;
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 50);
+camera.position.set(0.15, 0.75, 0.9);
+const controls = new OrbitControls(camera, canvas); controls.target.set(0, 0.03, 0); controls.enableDamping = true;
+controls.minDistance = 0.15; controls.maxDistance = 3; controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0x40382e, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-0.6, 1.2, -0.4); scene.add(sun);
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// The table model: 1 unit = 1 m on the table. Inside, positions are real metres scaled down.
+const TABLE_WIDTH = 1.0;
+const table = new THREE.Group(); scene.add(table);
+const model = new THREE.Group(); table.add(model);
+const SCALE = TABLE_WIDTH / (XMAX - XMIN);
+model.scale.set(SCALE, SCALE * EXAG, SCALE);
+let HBASE = 0;                                                        // lowest ground, sits on the table top
+const pos3 = (x, y, z) => [x, z - HBASE, -y];                          // real (east, north, height) -> model coords
+
+let today, past, ground = "today", morph = 1;                          // morph: 0 = 1952 ground, 1 = today
+let terrain, overlay, overlayCtx, overlayImg, overlayTex, sides;
+const rToday = new Float32Array(RW * RH), rPast = new Float32Array(RW * RH);
+function sampleRender(src, dst) {
+  for (let rj = 0; rj < RH; rj++) for (let ri = 0; ri < RW; ri++) {
+    const i = Math.min(W - 1, ri * RS), j = Math.min(H - 1, rj * RS), v = src[j * W + i];
+    dst[rj * RW + ri] = isFinite(v) ? v : HBASE;
+  }
+}
+function buildTerrain(imagery) {
+  const n = RW * RH, pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), guv = new Float32Array(n * 2);
+  for (let rj = 0; rj < RH; rj++) for (let ri = 0; ri < RW; ri++) {
+    const k = rj * RW + ri, i = Math.min(W - 1, ri * RS), j = Math.min(H - 1, rj * RS);
+    const [x, y] = cellXY(j * W + i), [lon, lat] = toLL(x, y), [u, v] = imagery.uvOf(lon, lat);
+    pos.set(pos3(x, y, rToday[k]), k * 3); uv.set([u, v], k * 2); guv.set([(i + 0.5) / W, (j + 0.5) / H], k * 2);
+  }
+  const idx = [];
+  for (let rj = 0; rj < RH - 1; rj++) for (let ri = 0; ri < RW - 1; ri++) {
+    const a = rj * RW + ri, b = a + 1, c = a + RW, d = c + 1; idx.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  const posAttr = new THREE.BufferAttribute(pos, 3); posAttr.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("position", posAttr); geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+  const tex = new THREE.CanvasTexture(imagery.canvas); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  terrain = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex })); model.add(terrain);
+  // hazard overlay: same shape, its own texture in grid space
+  const og = new THREE.BufferGeometry(); og.setAttribute("position", posAttr); og.setAttribute("uv", new THREE.BufferAttribute(guv, 2)); og.setIndex(idx);
+  const oc = document.createElement("canvas"); oc.width = W; oc.height = H; overlayCtx = oc.getContext("2d"); overlayImg = overlayCtx.createImageData(W, H);
+  overlayTex = new THREE.CanvasTexture(oc); overlayTex.flipY = false; overlayTex.colorSpace = THREE.SRGBColorSpace;
+  overlay = new THREE.Mesh(og, new THREE.MeshBasicMaterial({ map: overlayTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+  overlay.renderOrder = 1; model.add(overlay);
+  // sides and base, so it reads as a model on the table
+  const sp = [], si = [];
+  const edge = (list) => { const start = sp.length / 3; list.forEach(k => { const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]; sp.push(x, y, z, x, -120, z); });
+    for (let m = 0; m < list.length - 1; m++) { const a = start + m * 2; si.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); } return start; };
+  const top = [], bottom = [], left = [], right = [];
+  for (let ri = 0; ri < RW; ri++) { top.push(ri); bottom.push((RH - 1) * RW + ri); }
+  for (let rj = 0; rj < RH; rj++) { left.push(rj * RW); right.push(rj * RW + RW - 1); }
+  const sideLists = [top, right, bottom.slice().reverse(), left.slice().reverse()];
+  sideLists.forEach(edge);
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3)); sg.setIndex(si); sg.computeVertexNormals();
+  sides = new THREE.Mesh(sg, new THREE.MeshLambertMaterial({ color: 0x5b4a3a, side: THREE.DoubleSide })); sides.userData.lists = sideLists; model.add(sides);
+}
+function applyMorph(t) {
+  morph = t; const p = terrain.geometry.attributes.position;
+  if (mudMesh) mudMesh.visible = t > 0.99;                             // the lahar surface belongs to today's ground
+  for (let k = 0; k < RW * RH; k++) p.array[k * 3 + 1] = (rPast[k] + (rToday[k] - rPast[k]) * t) - HBASE;
+  p.needsUpdate = true; terrain.geometry.computeVertexNormals();
+  const sp = sides.geometry.attributes.position; let m = 0;
+  for (const list of sides.userData.lists) for (const k of list) { sp.array[m * 6 + 1] = p.array[k * 3 + 1]; m++; }
+  sp.needsUpdate = true;
+}
+
+// ---------------- Hazards ----------------
+const COLORS = { aval: [138, 90, 43], blast: [109, 40, 217], pf: [220, 38, 38], lahar: [14, 116, 144] };
+const NAMES = { aval: "Debris avalanche", blast: "Lateral blast", pf: "Pyroclastic flows", lahar: "Lahar" };
+const LAHARS = {
+  nf: { name: "North Fork Toutle", lon: -122.300, lat: 46.285, vol: 140 },     // formed from water escaping the avalanche deposit (USGS)
+  sf: { name: "South Fork Toutle", lon: -122.2250, lat: 46.1850, vol: 13 },    // these three poured down the volcano (USGS)
+  pine: { name: "Pine Creek", lon: -122.1700, lat: 46.1700, vol: 8 },
+  muddy: { name: "Muddy River", lon: -122.1600, lat: 46.1900, vol: 5.5 }
+};
+const nets = {};
+const net = (which) => nets[which] || (nets[which] = HM.flowNetwork(which === "past" ? past : today, W, H, 0));
+const results = {};                                                   // per hazard: cells, bins, times, extra meshes
+let mudMesh = null, coneMesh = null;
+
+function laharTimes(r, h) {
+  const n = r.path.length, tPath = new Float64Array(n);
+  const vOf = (s) => { const x = Math.min(1, Math.max(0, (Math.log10(Math.max(s, 1e-6)) + 3) / 2)); return 5 * Math.pow(145 / 5, x) / 3.6; };
+  for (let p = 1; p < n; p++) { const a = Math.max(0, p - 8), b = Math.min(n - 1, p + 8), run = r.pathDist[b] - r.pathDist[a];
+    const s = run > 0 ? Math.max(0, (h[r.path[a]] - h[r.path[b]]) / run) : 0; tPath[p] = tPath[p - 1] + (r.pathDist[p] - r.pathDist[p - 1]) / vOf(s); }
+  return (d) => { let lo = 0, hi = n - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (r.pathDist[m] <= d) lo = m; else hi = m - 1; } return tPath[lo]; };
+}
+const km = (m) => (m / 1000).toFixed(1) + " km";
+const fmtDur = (t) => { t = Math.round(t); if (t < 60) return t + " s"; const m = Math.floor(t / 60); if (m < 60) return m + " min"; return Math.floor(m / 60) + " h " + (m % 60) + " min"; };
+
+function runHazard(key) {
+  const res = { key, cells: [], vals: [], timed: true, prox: null, route: null, level: null, text: "" };
+  if (key === "aval" || key === "lahar") {
+    const surf = key === "aval" ? "past" : "today", h = surf === "past" ? past : today, N = net(surf);
+    const p = key === "aval" ? { lon: -122.1968, lat: 46.2138 } : LAHARS[$("valley").value];
+    const start = HM.snapToChannel(N, W, H, idxOf(p.lon, p.lat), 10, key === "aval" ? 3 : 10);
+    if (start < 0) return null;
+    const V = key === "aval" ? 2.5e9 : LAHARS[$("valley").value].vol * 1e6, [a1, a2] = key === "aval" ? [0.2, 20] : [0.05, 200];
+    const summit = surf === "past" ? [-122.1918, 46.1976] : [-122.1944, 46.1912], apex = HM.highestNear(h, W, H, idxOf(...summit), 25);
+    const r = HM.laharz(h, N, W, H, CELL, start, a1 * Math.pow(V, 2 / 3), a2 * Math.pow(V, 2 / 3), () => {}, { maxHalfWidthCells: 67, proximal: { apex, k: 0.23 } });
+    const cl = HM.cleanForDisplay(r.flooded, r.surface, h, W, H, 2);
+    for (let q = 0; q < W * H; q++) if (cl.mask[q]) { res.cells.push(q); res.vals.push(isFinite(r.distOf[q]) ? r.distOf[q] : r.length); }
+    if (key === "lahar") { const T = laharTimes(r, h); res.vals = res.vals.map(T); } else res.timed = false;
+    if (r.proximalExit > 0) {
+      res.prox = []; HM.energyCone(h, W, H, CELL, apex, 10, 0.23, null, (c) => res.prox.push(c));
+      res.route = r.path.slice(0, r.proximalExit + 1);
+    }
+    res.level = key === "lahar" ? cl.surface : null;
+    const left = r.reason === "edge" ? " It ran off the edge of the table." : "";
+    res.text = key === "aval" ? `Travelled ${km(r.length)} (1980: 23 km).` :
+      `${LAHARS[$("valley").value].name}: travelled ${km(r.length)} down the valley.${left}`;
+  } else {
+    const surf = key === "blast" ? "past" : "today", h = surf === "past" ? past : today;
+    let vent = key === "blast" ? idxOf(-122.1918, 46.2120) : idxOf(-122.1890, 46.1990);
+    if (key === "pf") { let bz = h[vent]; const ci = vent % W, cj = (vent / W) | 0;
+      for (let dj = -8; dj <= 8; dj++) for (let di = -8; di <= 8; di++) { const c = (cj + dj) * W + ci + di; if (h[c] < bz) { bz = h[c]; vent = c; } } }
+    const Hh = key === "blast" ? 400 : 200, k = key === "blast" ? 0.08 : 0.11, sector = key === "blast" ? { center: 0, half: 90, taper: 35, kEdge: 0.5 } : null;
+    const speed = key === "blast" ? 480 / 3.6 : 105 / 3.6;
+    HM.energyCone(h, W, H, CELL, vent, Hh, k, sector, (c, d) => { res.cells.push(c); res.vals.push(d / speed); });
+    const [vx, vy] = cellXY(vent); let north = 0; for (const c of res.cells) { const [, y] = cellXY(c); north = Math.max(north, y - vy); }
+    const area = res.cells.length * CELL * CELL / 1e6;
+    res.text = key === "blast" ? `Covered ${Math.round(area)} km² (1980: 600 km²).` : `Reached ${km(north)} north (1980: about 8 km).`;
+    res.cone = { vent, Hh, k, sector, h };
+  }
+  // order cells by arrival for the animation
+  const ord = res.cells.map((c, i) => i).sort((a, b) => res.vals[a] - res.vals[b]);
+  res.cells = ord.map(i => res.cells[i]); res.vals = ord.map(i => res.vals[i]);
+  res.vmin = res.vals[0] || 0; res.vmax = res.vals[res.vals.length - 1] || 1;
+  return res;
+}
+
+// Overlay painting
+function paintCell(c, col, a) { const o = c * 4, D = overlayImg.data; D[o] = col[0]; D[o + 1] = col[1]; D[o + 2] = col[2]; D[o + 3] = Math.max(D[o + 3], a); }
+function paintAll(except) {
+  overlayImg.data.fill(0);
+  for (const k of ["blast", "pf", "aval", "lahar"]) { const r = results[k]; if (!r || k === except) continue;
+    if (r.prox) r.prox.forEach(c => paintCell(c, COLORS[k], 90)); if (r.route) paintRoute(r.route, COLORS[k]);
+    r.cells.forEach(c => paintCell(c, COLORS[k], 175)); }
+}
+function paintRoute(route, col) { for (const c of route) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const q = c + dj * W + di; if (q >= 0 && q < W * H) paintCell(q, col, 255); } }
+function flushOverlay() { overlayCtx.putImageData(overlayImg, 0, 0); overlayTex.needsUpdate = true; }
+
+// 3D lahar mud surface (cells in arrival order, revealed with drawRange)
+function buildMud(res) {
+  if (mudMesh) { model.remove(mudMesh); mudMesh.geometry.dispose(); mudMesh = null; }
+  if (!res.level) return;
+  const L = res.level, cz = (ci, cj) => { let s = 0, n = 0; for (const [di, dj] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { const i = ci + di, j = cj + dj;
+    if (i < 0 || j < 0 || i >= W || j >= H) continue; const v = L[j * W + i]; if (isFinite(v)) { s += v; n++; } } return s / n + 1.5; };
+  const pos = new Float32Array(res.cells.length * 18); let o = 0;
+  for (const c of res.cells) { const i = c % W, j = (c / W) | 0;
+    const corner = (ci, cj) => pos3(XMIN + ci * CELL, YMAX - cj * CELL, cz(ci, cj));
+    const tl = corner(i, j), tr = corner(i + 1, j), br = corner(i + 1, j + 1), bl = corner(i, j + 1);
+    for (const v of [bl, br, tr, bl, tr, tl]) { pos[o++] = v[0]; pos[o++] = v[1]; pos[o++] = v[2]; } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals(); g.setDrawRange(0, 0);
+  mudMesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: new THREE.Color(...COLORS.lahar.map(v => v / 255)), transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+  mudMesh.renderOrder = 2; model.add(mudMesh);
+}
+function buildCone(res) {
+  if (coneMesh) { model.remove(coneMesh); coneMesh = null; }
+  if (!res.cone) return;
+  const { vent, Hh, k, sector, h } = res.cone, [vx, vy] = cellXY(vent), z0 = h[vent] + Hh, Rm = Math.min((z0 - HBASE) / k, 25000), NR = 20;
+  const a0 = sector ? sector.center - sector.half : 0, span = sector ? sector.half * 2 : 360, NS = Math.round(span / 4);
+  const pos = [...pos3(vx, vy, z0)], idx = [];
+  for (let r = 1; r <= NR; r++) for (let s = 0; s <= NS; s++) { const d = Rm * r / NR, az = (a0 + span * s / NS) * Math.PI / 180; pos.push(...pos3(vx + d * Math.sin(az), vy + d * Math.cos(az), z0 - k * d)); }
+  const at = (r, s) => 1 + (r - 1) * (NS + 1) + s;
+  for (let s = 0; s < NS; s++) idx.push(0, at(1, s), at(1, s + 1));
+  for (let r = 1; r < NR; r++) for (let s = 0; s < NS; s++) idx.push(at(r, s), at(r + 1, s), at(r + 1, s + 1), at(r, s), at(r + 1, s + 1), at(r, s + 1));
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  coneMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
+  coneMesh.renderOrder = 3; model.add(coneMesh);
+}
+
+// Playback: 12 s per hazard, driven by the render loop (works in VR too)
+let play = null;
+const DURATION = 12;
+function startHazard(key) {
+  if (!today) return;
+  info(`<b>${NAMES[key]}</b><br>Working it out…`);
+  setTimeout(() => {                                                   // let the message show before the heavy work
+    const res = runHazard(key);
+    if (!res) { info(`<b>${NAMES[key]}</b><br>No valley found near the start point.`); return; }
+    results[key] = res;
+    paintAll(key); flushOverlay(); buildCone(res); buildMud(res);
+    if (key === "aval" || key === "blast") setGround("past", false); else setGround("today", false);
+    play = { key, res, t0: performance.now(), shown: 0 };
+    document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.h === key)));
+  }, 30);
+}
+function stepPlay(now) {
+  if (!play) return;
+  const { key, res } = play, f = Math.min(1, (now - play.t0) / 1000 / DURATION);
+  if (play.shown === 0) { if (res.prox) res.prox.forEach(c => paintCell(c, COLORS[key], 90)); if (res.route) paintRoute(res.route, COLORS[key]); }
+  const vcut = res.vmin + (res.vmax - res.vmin) * f; let n = play.shown;
+  while (n < res.cells.length && res.vals[n] <= vcut) { paintCell(res.cells[n], COLORS[key], 175); n++; }
+  if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); flushOverlay(); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
+  if (key === "aval") applyMorph(f);                                   // the mountain changes from 1952 to today's shape as the avalanche runs
+  const clock = res.timed ? `Time since it started: <span id="clock">${fmtDur(vcut)}</span>` : "No reliable speed found for the avalanche, so it plays in order.";
+  if (now - (play.lastInfo || 0) > 200 || f === 1) { info(`<b>${NAMES[key]}</b><br>${clock}${f === 1 ? "<br>" + res.text : ""}`); play.lastInfo = now; }
+  if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; }
+}
+function setGround(which, animate) {
+  ground = which; updateGroundButton();
+  if (!animate) { applyMorph(which === "past" ? 0 : 1); return; }
+  const from = morph, to = which === "past" ? 0 : 1, t0 = performance.now();
+  groundAnim = { from, to, t0 };
+}
+let groundAnim = null;
+function stepGround(now) { if (!groundAnim) return; const f = Math.min(1, (now - groundAnim.t0) / 2500); applyMorph(groundAnim.from + (groundAnim.to - groundAnim.from) * f); if (f === 1) groundAnim = null; }
+function updateGroundButton() { $("ground").textContent = ground === "past" ? "Ground: 1952 (before)" : "Ground: today"; panelDirty = true; }
+
+// ---------------- HTML controls ----------------
+document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = () => startHazard(b.dataset.h));
+$("ground").onclick = () => { if (!past) return; setGround(ground === "past" ? "today" : "past", true); };
+$("clear").onclick = () => clearAll();
+function clearAll() { for (const k in results) delete results[k]; play = null; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
+
+// ---------------- WebXR ----------------
+const xrBox = $("xr");
+// Only show the headset buttons on devices that support them (e.g. Quest Browser)
+if (navigator.xr) (async () => {
+  const opts = { requiredFeatures: ["local-floor"], optionalFeatures: ["hand-tracking"] };
+  const [arOK, vrOK] = await Promise.all(["immersive-ar", "immersive-vr"].map(m => navigator.xr.isSessionSupported(m).catch(() => false)));
+  const label = (btn, text) => { const f = () => { const s = btn.textContent; if ((s === "START AR" || s === "ENTER VR") && s !== text) btn.textContent = text; };
+    new MutationObserver(f).observe(btn, { childList: true, characterData: true, subtree: true }); f(); };
+  if (arOK) { const ar = ARButton.createButton(renderer, opts); xrBox.append(ar); label(ar, "View on your table"); }
+  if (vrOK) { const vr = VRButton.createButton(renderer, opts); xrBox.append(vr); label(vr, "Enter VR"); }
+  if (arOK || vrOK) $("ui").querySelector(".sub").textContent = "Press \"View on your table\" to put the mountain on a real table, or \"Enter VR\".";
+})();
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 48).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a362f }));
+floor.visible = false; scene.add(floor);
+const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.72, 48), new THREE.MeshLambertMaterial({ color: 0x4a443a }));
+stand.visible = false; scene.add(stand);
+renderer.xr.addEventListener("sessionstart", () => {
+  const ar = renderer.xr.getSession().environmentBlendMode && renderer.xr.getSession().environmentBlendMode !== "opaque";
+  scene.background = ar ? null : bg; floor.visible = !ar; stand.visible = !ar;
+  needPlace = true; panel.visible = true;
+});
+renderer.xr.addEventListener("sessionend", () => {
+  scene.background = bg; floor.visible = stand.visible = false; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); panel.visible = false;
+});
+
+// Floating 3D menu
+const PW = 1024, PH = 1180, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
+const pctx = panelCanvas.getContext("2d"), panelTex = new THREE.CanvasTexture(panelCanvas); panelTex.colorSpace = THREE.SRGBColorSpace;
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34 * PH / PW), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true }));
+panel.visible = false; scene.add(panel);
+let panelDirty = true, panelInfo = "", hover = -1;
+const BTN = [];
+const addBtn = (id, label, x, y, w, h, color) => BTN.push({ id, label, x, y, w, h, color });
+addBtn("aval", "1 Avalanche", 40, 150, 460, 110, "#8a5a2b"); addBtn("blast", "2 Blast", 524, 150, 460, 110, "#6d28d9");
+addBtn("pf", "3 Pyroclastic flows", 40, 280, 460, 110, "#dc2626"); addBtn("lahar", "4 Lahar", 524, 280, 460, 110, "#0e7490");
+addBtn("valley", "", 40, 410, 944, 90); addBtn("ground", "", 40, 520, 944, 90);
+addBtn("smaller", "Smaller", 40, 630, 300, 90); addBtn("bigger", "Bigger", 362, 630, 300, 90); addBtn("rotate", "Turn", 684, 630, 300, 90);
+addBtn("clear", "Clear", 40, 740, 460, 90); addBtn("reset", "Reset table", 524, 740, 460, 90);
+function drawPanel() {
+  pctx.clearRect(0, 0, PW, PH);
+  pctx.fillStyle = "rgba(255,253,248,0.95)"; roundRect(0, 0, PW, PH, 40); pctx.fill();
+  pctx.fillStyle = "#22201c"; pctx.font = "bold 56px system-ui, sans-serif"; pctx.fillText("Mount St Helens, 18 May 1980", 40, 95); pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText(VERSION, PW - 40 - pctx.measureText(VERSION).width, 130);
+  for (let b = 0; b < BTN.length; b++) {
+    const B = BTN[b]; let label = B.label;
+    if (B.id === "valley") label = "Lahar valley: " + LAHARS[$("valley").value].name;
+    if (B.id === "ground") label = ground === "past" ? "Ground: 1952 (before)  ·  tap for today" : "Ground: today  ·  tap for 1952";
+    pctx.fillStyle = b === hover ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+    if (play && play.key === B.id) { pctx.strokeStyle = "#b4381c"; pctx.lineWidth = 8; roundRect(B.x, B.y, B.w, B.h, 20); pctx.stroke(); }
+    let tx = B.x + 28; if (B.color) { pctx.fillStyle = B.color; pctx.fillRect(B.x + 26, B.y + B.h / 2 - 14, 28, 28); tx += 44; }
+    pctx.fillStyle = "#22201c"; pctx.font = "600 44px system-ui, sans-serif"; pctx.fillText(label, tx, B.y + B.h / 2 + 15);
+  }
+  pctx.fillStyle = "#22201c"; pctx.font = "40px system-ui, sans-serif";
+  wrap(panelInfo, 40, 900, PW - 80, 52);
+  pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 40);
+  panelTex.needsUpdate = true; panelDirty = false;
+}
+function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
+function wrap(text, x, y, maxW, lh) { const words = text.split(/\s+/); let line = "", yy = y; for (const w of words) { const t = line ? line + " " + w : w; if (pctx.measureText(t).width > maxW) { pctx.fillText(line, x, yy); line = w; yy += lh; } else line = t; } if (line) pctx.fillText(line, x, yy); }
+// Put the table and menu where the person actually is (standing or seated), on the first headset frame
+let needPlace = false;
+const head = new THREE.Vector3(), fwd = new THREE.Vector3();
+function placeAround() {
+  const cam = renderer.xr.getCamera(); cam.getWorldPosition(head); cam.getWorldDirection(fwd);
+  fwd.y = 0; if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+  const yaw = Math.atan2(-fwd.x, -fwd.z), side = new THREE.Vector3(-fwd.z, 0, fwd.x); // side = to the right
+  const ty = head.y > 0.9 ? head.y - 0.7 : head.y - 0.5;
+  table.position.set(head.x + fwd.x * 0.75, ty, head.z + fwd.z * 0.75); table.rotation.set(0, yaw, 0); table.scale.setScalar(1);
+  const sh = Math.max(0.05, ty - 0.02); stand.scale.set(1, sh / 0.72, 1); stand.position.set(table.position.x, sh / 2, table.position.z); stand.rotation.y = yaw;
+  stand.visible = floor.visible && ty > 0.3;
+  panel.position.set(head.x + fwd.x * 0.5 - side.x * 0.55, head.y - 0.45, head.z + fwd.z * 0.5 - side.z * 0.55); panel.lookAt(head.x, head.y - 0.2, head.z);
+  panelDirty = true; needPlace = false;
+}
+function pressButton(id) {
+  if (["aval", "blast", "pf", "lahar"].includes(id)) startHazard(id);
+  else if (id === "valley") { const o = [...$("valley").options].map(x => x.value), i = o.indexOf($("valley").value); $("valley").value = o[(i + 1) % o.length]; }
+  else if (id === "ground") $("ground").onclick();
+  else if (id === "smaller") table.scale.multiplyScalar(0.8);
+  else if (id === "bigger") table.scale.multiplyScalar(1.25);
+  else if (id === "rotate") table.rotateY(Math.PI / 4);
+  else if (id === "clear") clearAll();
+  else if (id === "reset") { for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; } placeAround(); }
+  panelDirty = true;
+}
+$("valley").onchange = () => { panelDirty = true; };
+
+// Controllers and hands: point + trigger/pinch presses buttons, grip grabs the table
+const raycaster = new THREE.Raycaster(), tmpM = new THREE.Matrix4();
+const cmf = new XRControllerModelFactory(), hmf = new XRHandModelFactory();
+const ctrls = [0, 1].map(i => {
+  const c = renderer.xr.getController(i); scene.add(c);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffffff }));
+  line.scale.z = 2; c.add(line);
+  const grip = renderer.xr.getControllerGrip(i); grip.add(cmf.createControllerModel(grip)); scene.add(grip);
+  const hand = renderer.xr.getHand(i); hand.add(hmf.createHandModel(hand, "spheres")); scene.add(hand);
+  c.addEventListener("select", () => { const b = hitButton(c); if (b >= 0) pressButton(BTN[b].id); });
+  c.addEventListener("squeezestart", () => { stand.visible = false; c.attach(table); c.userData.holding = true; });
+  c.addEventListener("squeezeend", () => { scene.attach(table); c.userData.holding = false; });
+  return c;
+});
+function hitButton(c) {
+  if (!panel.visible) return -1;
+  tmpM.identity().extractRotation(c.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld); raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
+  const hit = raycaster.intersectObject(panel)[0]; if (!hit || !hit.uv) return -1;
+  const x = hit.uv.x * PW, y = (1 - hit.uv.y) * PH;
+  return BTN.findIndex(B => x >= B.x && x <= B.x + B.w && y >= B.y && y <= B.y + B.h);
+}
+
+// ---------------- Render loop ----------------
+renderer.setAnimationLoop((t) => {
+  const now = performance.now();
+  stepPlay(now); stepGround(now);
+  if (renderer.xr.isPresenting) {
+    if (needPlace) placeAround();
+    let hv = -1; for (const c of ctrls) { const b = hitButton(c); if (b >= 0) hv = b; }
+    if (hv !== hover) { hover = hv; panelDirty = true; }
+    if (panelDirty) drawPanel();
+  } else controls.update();
+  renderer.render(scene, camera);
+});
+
+// ---------------- Load ----------------
+(async () => {
+  try {
+    info("Loading the mountain… 0%");
+    const [el, img] = await Promise.all([
+      loadElevation(f => info(`Loading the mountain… ${Math.round(f * 100)}%`)),
+      loadImagery(() => {})
+    ]);
+    today = el.h;
+    let lo = Infinity; for (const v of today) if (isFinite(v) && v < lo) lo = v; HBASE = lo - 50;
+    for (let c = 0; c < today.length; c++) if (!isFinite(today[c])) today[c] = HBASE;
+    try { past = await loadPast(today); } catch (e) { console.warn("No 1952 ground", e); past = today; $("ground").disabled = true; }
+    sampleRender(today, rToday); sampleRender(past, rPast);
+    buildTerrain(img);
+    $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles (USGS 3DEP, SRTM)", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Pre-1980 ground: USGS (Bard & Phillips-Netherton, 2024). Imagery: Esri World Imagery. Heights ×${EXAG}. ${VERSION}`;
+    info("Ready. Pick a hazard.");
+    console.info("MSH VR", VERSION, { grid: [W, H], elevation: el.source });
+  } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
+})();
+// Test hooks (used by automated tests; harmless otherwise)
+window.__msh = { renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
+  btnWorld(id) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
+    const v = new THREE.Vector3(((B.x + B.w / 2) / PW - 0.5) * 0.34, (0.5 - (B.y + B.h / 2) / PH) * 0.34 * PH / PW, 0); return panel.localToWorld(v).toArray(); },
+  aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
+</script>
+</body>
+</html>
