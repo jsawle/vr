@@ -22,6 +22,11 @@
   #ui h1 { font-size: 17px; margin: 0 0 2px; }
   #ui .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .grid4::before { content: "Show:"; grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  .grid4 button { font-size: 12px; padding: 6px 6px; }
+  .grid4 button[aria-pressed="false"]:not(:disabled) { opacity: .55; }
+  .grid4 button[aria-pressed="true"] { outline: none; }
   button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); text-align: left; }
   button .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
   button[aria-pressed="true"] { outline: 2px solid var(--accent); }
@@ -57,13 +62,19 @@
     <button id="ground">Ground: today</button>
     <button id="clear">Clear</button>
   </div>
+  <div id="show" class="grid4" aria-label="Show on the map">
+    <button data-s="aval" disabled aria-pressed="false"><span class="sw" style="background:#8a5a2b"></span>Aval.</button>
+    <button data-s="blast" disabled aria-pressed="false"><span class="sw" style="background:#6d28d9"></span>Blast</button>
+    <button data-s="pf" disabled aria-pressed="false"><span class="sw" style="background:#dc2626"></span>Pyro.</button>
+    <button data-s="lahar" disabled aria-pressed="false"><span class="sw" style="background:#0e7490"></span>Lahar</button>
+  </div>
   <div id="info">Loading the mountain…</div>
 </div>
 <div id="xr"></div>
 <div id="credits"></div>
 
 <script>
-/* Volcanic hazard models for classroom use. Version 1.4 (23 September 2026).
+/* Volcanic hazard models for classroom use. Version 1.5 (23 September 2026).
    1. Energy cone (Malin & Sheridan 1982) for pyroclastic density currents and, as an
       approximation, a lateral blast limited to a sector. A current starts at height H above
       the vent and its "energy line" drops by k (= H/L) metres per metre travelled. It can
@@ -297,7 +308,55 @@
     return { reached, maxDist };
   }
 
-  const api = { flowNetwork, snapToChannel, laharz, energyCone, highestNear, cleanForDisplay };
+  /* Proximal hazard zone as Laharz_py maps it: every cell whose ground is below the H/L cone from the apex
+     (cone height = apex height - k * distance), compared cell by cell, with no line-of-sight test.
+     Only the part connected to the apex is kept. If within is given (a mask), the zone is limited to it. */
+  function proximalZone(h, w, ht, cell, apex, k, within) {
+    const N = w * ht, ai = apex % w, aj = (apex / w) | 0, za = h[apex];
+    const below = new Uint8Array(N);
+    for (let c = 0; c < N; c++) { if (!isFinite(h[c])) continue; const d = Math.hypot(c % w - ai, ((c / w) | 0) - aj) * cell; if (h[c] < za - k * d) below[c] = 1; }
+    // outside = ground above the cone that connects to the edge of the grid; everything the boundary line encloses is inside
+    // (this includes a rounded summit that pokes above the cone near the apex)
+    const out = new Uint8Array(N), st = [];
+    for (let c = 0; c < N; c++) { const i = c % w, j = (c / w) | 0; if ((i === 0 || j === 0 || i === w - 1 || j === ht - 1) && !below[c]) { out[c] = 1; st.push(c); } }
+    while (st.length) { const c = st.pop(), i = c % w, j = (c / w) | 0;
+      for (let n = 0; n < 8; n++) { const ii = i + DI[n], jj = j + DJ[n]; if (ii < 0 || jj < 0 || ii >= w || jj >= ht) continue;
+        const q = jj * w + ii; if (out[q] || below[q]) continue; out[q] = 1; st.push(q); } }
+    const z = new Uint8Array(N), stack = [apex]; z[apex] = 1;
+    while (stack.length) { const c = stack.pop(), i = c % w, j = (c / w) | 0;
+      for (let n = 0; n < 8; n++) { const ii = i + DI[n], jj = j + DJ[n]; if (ii < 0 || jj < 0 || ii >= w || jj >= ht) continue;
+        const q = jj * w + ii; if (z[q] || out[q] || !isFinite(h[q])) continue; z[q] = 1; stack.push(q); } }
+    if (within) for (let c = 0; c < N; c++) if (!within[c]) z[c] = 0;
+    return z;
+  }
+  // Every cell that drains (by the D8 flow directions) to outlet: its catchment.
+  function catchment(net, w, ht, outlet) {
+    const N = w * ht, head = new Int32Array(N).fill(-1), next = new Int32Array(N).fill(-1);
+    for (let c = 0; c < N; c++) { const k = net.dir[c]; if (k < 0) continue; const ii = c % w + DI[k], jj = ((c / w) | 0) + DJ[k];
+      if (ii < 0 || jj < 0 || ii >= w || jj >= ht) continue; const p = jj * w + ii; next[c] = head[p]; head[p] = c; }
+    const m = new Uint8Array(N), stack = [outlet]; m[outlet] = 1;
+    while (stack.length) { const p = stack.pop(); for (let c = head[p]; c >= 0; c = next[c]) if (!m[c]) { m[c] = 1; stack.push(c); } }
+    return m;
+  }
+  // Round off a drawn area: a cell is kept if at least half of a disc of the given radius (cells) around it is in the mask.
+  // Repeated passes remove thin fingers and fill notches. For drawing only.
+  function smoothMask(mask, w, ht, radius, passes) {
+    let a = Uint8Array.from(mask); const offs = [];
+    for (let dj = -radius; dj <= radius; dj++) for (let di = -radius; di <= radius; di++) if (di * di + dj * dj <= radius * radius) offs.push([di, dj]);
+    let i0 = w, i1 = -1, j0 = ht, j1 = -1;
+    for (let c = 0; c < w * ht; c++) if (mask[c]) { const i = c % w, j = (c / w) | 0; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    if (i1 < 0) return a;
+    i0 = Math.max(0, i0 - radius); i1 = Math.min(w - 1, i1 + radius); j0 = Math.max(0, j0 - radius); j1 = Math.min(ht - 1, j1 + radius);
+    for (let p = 0; p < passes; p++) {
+      const b = new Uint8Array(w * ht);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        let n = 0, t = 0; for (const [di, dj] of offs) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= ht) continue; t++; n += a[jj * w + ii]; }
+        b[j * w + i] = n * 2 >= t ? 1 : 0; }
+      a = b; }
+    return a;
+  }
+
+  const api = { flowNetwork, snapToChannel, laharz, energyCone, highestNear, cleanForDisplay, proximalZone, catchment, smoothMask };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.HazardModels = api;
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -311,7 +370,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.2";
+const VERSION = "VR 0.3";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -504,7 +563,7 @@ function applyMorph(t) {
 const COLORS = { aval: [138, 90, 43], blast: [109, 40, 217], pf: [220, 38, 38], lahar: [14, 116, 144] };
 const NAMES = { aval: "Debris avalanche", blast: "Lateral blast", pf: "Pyroclastic flows", lahar: "Lahar" };
 const LAHARS = {
-  nf: { name: "North Fork Toutle", lon: -122.300, lat: 46.285, vol: 140 },     // formed from water escaping the avalanche deposit (USGS)
+  nf: { name: "North Fork Toutle", lon: -122.2300, lat: 46.2790, vol: 140 },     // formed from water escaping the avalanche deposit (USGS)
   sf: { name: "South Fork Toutle", lon: -122.2250, lat: 46.1850, vol: 13 },    // these three poured down the volcano (USGS)
   pine: { name: "Pine Creek", lon: -122.1700, lat: 46.1700, vol: 8 },
   muddy: { name: "Muddy River", lon: -122.1600, lat: 46.1900, vol: 5.5 }
@@ -535,10 +594,14 @@ function runHazard(key) {
     const summit = surf === "past" ? [-122.1918, 46.1976] : [-122.1944, 46.1912], apex = HM.highestNear(h, W, H, idxOf(...summit), 25);
     const r = HM.laharz(h, N, W, H, CELL, start, a1 * Math.pow(V, 2 / 3), a2 * Math.pow(V, 2 / 3), () => {}, { maxHalfWidthCells: 67, proximal: { apex, k: 0.23 } });
     const cl = HM.cleanForDisplay(r.flooded, r.surface, h, W, H, 2);
+    { const sm = HM.smoothMask(cl.mask, W, H, 2, 2); for (let q = 0; q < W * H; q++) if (!sm[q]) cl.mask[q] = 0; }   // round off thin fingers (drawing only)
     for (let q = 0; q < W * H; q++) if (cl.mask[q]) { res.cells.push(q); res.vals.push(isFinite(r.distOf[q]) ? r.distOf[q] : r.length); }
     if (key === "lahar") { const T = laharTimes(r, h); res.vals = res.vals.map(T); } else res.timed = false;
     if (r.proximalExit > 0) {
-      res.prox = []; HM.energyCone(h, W, H, CELL, apex, 10, 0.23, null, (c) => res.prox.push(c));
+      // danger zone mapped as Laharz_py does (ground below the H/L cone, cell by cell), only the slopes draining into this valley
+      const z = HM.proximalZone(h, W, H, CELL, apex, 0.23, HM.catchment(N, W, H, r.path[r.proximalExit])), [ax, ay] = cellXY(apex), pd = [];
+      for (let q = 0; q < W * H; q++) if (z[q]) { const [x, y] = cellXY(q); pd.push([q, Math.hypot(x - ax, y - ay)]); }
+      pd.sort((a, b) => a[1] - b[1]); res.prox = pd.map(p => p[0]); res.proxD = pd.map(p => p[1]); res.proxMax = pd.length ? pd[pd.length - 1][1] : 1;
       res.route = r.path.slice(0, r.proximalExit + 1);
     }
     res.level = key === "lahar" ? cl.surface : null;
@@ -550,7 +613,7 @@ function runHazard(key) {
     let vent = key === "blast" ? idxOf(-122.1918, 46.2120) : idxOf(-122.1890, 46.1990);
     if (key === "pf") { let bz = h[vent]; const ci = vent % W, cj = (vent / W) | 0;
       for (let dj = -8; dj <= 8; dj++) for (let di = -8; di <= 8; di++) { const c = (cj + dj) * W + ci + di; if (h[c] < bz) { bz = h[c]; vent = c; } } }
-    const Hh = key === "blast" ? 400 : 200, k = key === "blast" ? 0.08 : 0.11, sector = key === "blast" ? { center: 0, half: 90, taper: 35, kEdge: 0.5 } : null;
+    const Hh = key === "blast" ? 400 : 200, k = key === "blast" ? 0.08 : 0.11, sector = key === "blast" ? { center: 0, half: 75, taper: 25, kEdge: 1.0 } : null;
     const speed = key === "blast" ? 480 / 3.6 : 105 / 3.6;
     HM.energyCone(h, W, H, CELL, vent, Hh, k, sector, (c, d) => { res.cells.push(c); res.vals.push(d / speed); });
     const [vx, vy] = cellXY(vent); let north = 0; for (const c of res.cells) { const [, y] = cellXY(c); north = Math.max(north, y - vy); }
@@ -567,13 +630,28 @@ function runHazard(key) {
 
 // Overlay painting
 function paintCell(c, col, a) { const o = c * 4, D = overlayImg.data; D[o] = col[0]; D[o + 1] = col[1]; D[o + 2] = col[2]; D[o + 3] = Math.max(D[o + 3], a); }
+const hidden = new Set();
+// Bottom to top: blast (largest area), avalanche, pyroclastic flows, lahars (as on the map page)
 function paintAll(except) {
   overlayImg.data.fill(0);
-  for (const k of ["blast", "pf", "aval", "lahar"]) { const r = results[k]; if (!r || k === except) continue;
+  for (const k of ["blast", "aval", "pf", "lahar"]) { const r = results[k]; if (!r || k === except || hidden.has(k)) continue;
     if (r.prox) r.prox.forEach(c => paintCell(c, COLORS[k], 90)); if (r.route) paintRoute(r.route, COLORS[k]);
     r.cells.forEach(c => paintCell(c, COLORS[k], 175)); }
 }
 function paintRoute(route, col) { for (const c of route) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const q = c + dj * W + di; if (q >= 0 && q < W * H) paintCell(q, col, 255); } }
+function toggleShow(k) {
+  if (!results[k]) return;
+  if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
+  if (play && play.key === k) {                                     // end its playback at once, then repaint everything shown
+    if (k === "aval") { applyMorph(1); ground = "today"; updateGroundButton(); }
+    info(`<b>${NAMES[k]}</b><br>${play.res.text}`); play = null; }
+  paintAll(); flushOverlay();
+  if (mudMesh) { mudMesh.visible = !hidden.has("lahar"); mudMesh.geometry.setDrawRange(0, Infinity); }
+  if (coneMesh) coneMesh.visible = !hidden.has(coneMesh.userData.key);
+  syncShow(); panelDirty = true;
+}
+function syncShow() { document.querySelectorAll("#show button").forEach(b => { const k = b.dataset.s, has = !!results[k];
+  b.disabled = !has; b.setAttribute("aria-pressed", String(has && !hidden.has(k))); }); }
 function flushOverlay() { overlayCtx.putImageData(overlayImg, 0, 0); overlayTex.needsUpdate = true; }
 
 // 3D lahar mud surface (cells in arrival order, revealed with drawRange)
@@ -603,7 +681,7 @@ function buildCone(res) {
   for (let r = 1; r < NR; r++) for (let s = 0; s < NS; s++) idx.push(at(r, s), at(r + 1, s), at(r + 1, s + 1), at(r, s), at(r + 1, s + 1), at(r, s + 1));
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
   coneMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
-  coneMesh.renderOrder = 3; model.add(coneMesh);
+  coneMesh.renderOrder = 3; coneMesh.userData.key = res.key; model.add(coneMesh);
 }
 
 // Playback: 12 s per hazard, driven by the render loop (works in VR too)
@@ -615,7 +693,7 @@ function startHazard(key) {
   setTimeout(() => {                                                   // let the message show before the heavy work
     const res = runHazard(key);
     if (!res) { info(`<b>${NAMES[key]}</b><br>No valley found near the start point.`); return; }
-    results[key] = res;
+    results[key] = res; hidden.delete(key); syncShow(); panelDirty = true;
     paintAll(key); flushOverlay(); buildCone(res); buildMud(res);
     if (key === "aval" || key === "blast") setGround("past", false); else setGround("today", false);
     play = { key, res, t0: performance.now(), shown: 0 };
@@ -625,8 +703,14 @@ function startHazard(key) {
 function stepPlay(now) {
   if (!play) return;
   const { key, res } = play, f = Math.min(1, (now - play.t0) / 1000 / DURATION);
-  if (play.shown === 0) { if (res.prox) res.prox.forEach(c => paintCell(c, COLORS[key], 90)); if (res.route) paintRoute(res.route, COLORS[key]); }
-  const vcut = res.vmin + (res.vmax - res.vmin) * f; let n = play.shown;
+  // first the danger zone fills outward from the summit, then the flow runs down the valley
+  const PF = res.prox ? 0.2 : 0, fp = PF ? Math.min(1, f / PF) : 1, fm = PF ? Math.max(0, (f - PF) / (1 - PF)) : f;
+  if (res.prox) { const dcut = res.proxMax * fp; let m = play.proxShown || 0;
+    while (m < res.prox.length && res.proxD[m] <= dcut) { paintCell(res.prox[m], COLORS[key], 90); m++; }
+    if (m !== (play.proxShown || 0)) { play.proxShown = m; flushOverlay(); }
+    if (fp < 1) { if (key === "aval") applyMorph(f); return; }
+    if (!play.routeShown && res.route) { paintRoute(res.route, COLORS[key]); play.routeShown = true; } }
+  const vcut = res.vmin + (res.vmax - res.vmin) * fm; let n = play.shown;
   while (n < res.cells.length && res.vals[n] <= vcut) { paintCell(res.cells[n], COLORS[key], 175); n++; }
   if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); flushOverlay(); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
   if (key === "aval") applyMorph(f);                                   // the mountain changes from 1952 to today's shape as the avalanche runs
@@ -648,7 +732,8 @@ function updateGroundButton() { $("ground").textContent = ground === "past" ? "G
 document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = () => startHazard(b.dataset.h));
 $("ground").onclick = () => { if (!past) return; setGround(ground === "past" ? "today" : "past", true); };
 $("clear").onclick = () => clearAll();
-function clearAll() { for (const k in results) delete results[k]; play = null; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
+document.querySelectorAll("#show button").forEach(b => b.onclick = () => toggleShow(b.dataset.s));
+function clearAll() { for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
 
 // ---------------- WebXR ----------------
 const xrBox = $("xr");
@@ -676,7 +761,7 @@ renderer.xr.addEventListener("sessionend", () => {
 });
 
 // Floating 3D menu
-const PW = 1024, PH = 1180, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
+const PW = 1024, PH = 1300, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
 const pctx = panelCanvas.getContext("2d"), panelTex = new THREE.CanvasTexture(panelCanvas); panelTex.colorSpace = THREE.SRGBColorSpace;
 const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34 * PH / PW), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true }));
 panel.visible = false; scene.add(panel);
@@ -688,12 +773,21 @@ addBtn("pf", "3 Pyroclastic flows", 40, 280, 460, 110, "#dc2626"); addBtn("lahar
 addBtn("valley", "", 40, 410, 944, 90); addBtn("ground", "", 40, 520, 944, 90);
 addBtn("smaller", "Smaller", 40, 630, 300, 90); addBtn("bigger", "Bigger", 362, 630, 300, 90); addBtn("rotate", "Turn", 684, 630, 300, 90);
 addBtn("clear", "Clear", 40, 740, 460, 90); addBtn("reset", "Reset table", 524, 740, 460, 90);
+// show / hide each hazard once it has been run
+[["aval", "Avalanche", "#8a5a2b"], ["blast", "Blast", "#6d28d9"], ["pf", "Pyro. flows", "#dc2626"], ["lahar", "Lahar", "#0e7490"]]
+  .forEach(([k, name, col], n) => addBtn("show:" + k, name, 40 + n * 238, 890, 224, 90, col));
 function drawPanel() {
   pctx.clearRect(0, 0, PW, PH);
   pctx.fillStyle = "rgba(255,253,248,0.95)"; roundRect(0, 0, PW, PH, 40); pctx.fill();
   pctx.fillStyle = "#22201c"; pctx.font = "bold 56px system-ui, sans-serif"; pctx.fillText("Mount St Helens, 18 May 1980", 40, 95); pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText(VERSION, PW - 40 - pctx.measureText(VERSION).width, 130);
+  pctx.fillStyle = "#6b665c"; pctx.font = "600 32px system-ui, sans-serif"; pctx.fillText("Show on the map", 40, 872);
   for (let b = 0; b < BTN.length; b++) {
     const B = BTN[b]; let label = B.label;
+    if (B.id.startsWith("show:")) { const k = B.id.slice(5), has = !!results[k], on = has && !hidden.has(k);
+      pctx.globalAlpha = has ? 1 : 0.4; pctx.fillStyle = b === hover && has ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+      const bx = B.x + 20, by = B.y + B.h / 2 - 16; pctx.lineWidth = 4; pctx.strokeStyle = "#22201c"; pctx.strokeRect(bx, by, 32, 32);
+      if (on) { pctx.fillStyle = B.color; pctx.fillRect(bx + 4, by + 4, 24, 24); }
+      pctx.fillStyle = "#22201c"; pctx.font = "600 34px system-ui, sans-serif"; pctx.fillText(B.label, bx + 46, B.y + B.h / 2 + 12); pctx.globalAlpha = 1; continue; }
     if (B.id === "valley") label = "Lahar valley: " + LAHARS[$("valley").value].name;
     if (B.id === "ground") label = ground === "past" ? "Ground: 1952 (before)  ·  tap for today" : "Ground: today  ·  tap for 1952";
     pctx.fillStyle = b === hover ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
@@ -702,7 +796,7 @@ function drawPanel() {
     pctx.fillStyle = "#22201c"; pctx.font = "600 44px system-ui, sans-serif"; pctx.fillText(label, tx, B.y + B.h / 2 + 15);
   }
   pctx.fillStyle = "#22201c"; pctx.font = "40px system-ui, sans-serif";
-  wrap(panelInfo, 40, 900, PW - 80, 52);
+  wrap(panelInfo, 40, 1040, PW - 80, 52);
   pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 40);
   panelTex.needsUpdate = true; panelDirty = false;
 }
@@ -719,7 +813,8 @@ function placeAround() {
   table.position.set(head.x + fwd.x * 0.75, ty, head.z + fwd.z * 0.75); table.rotation.set(0, yaw, 0); table.scale.setScalar(1);
   const sh = Math.max(0.05, ty - 0.02); stand.scale.set(1, sh / 0.72, 1); stand.position.set(table.position.x, sh / 2, table.position.z); stand.rotation.y = yaw;
   stand.visible = floor.visible && ty > 0.3;
-  panel.position.set(head.x + fwd.x * 0.5 - side.x * 0.55, head.y - 0.45, head.z + fwd.z * 0.5 - side.z * 0.55); panel.lookAt(head.x, head.y - 0.2, head.z);
+  // menu to the left of the table (the table is 1 m wide), raised above the tallest terrain so they never overlap
+  panel.position.set(head.x + fwd.x * 0.6 - side.x * 0.8, head.y - 0.25, head.z + fwd.z * 0.6 - side.z * 0.8); panel.lookAt(head.x, head.y - 0.1, head.z);
   panelDirty = true; needPlace = false;
 }
 function pressButton(id) {
@@ -730,6 +825,7 @@ function pressButton(id) {
   else if (id === "bigger") table.scale.multiplyScalar(1.25);
   else if (id === "rotate") table.rotateY(Math.PI / 4);
   else if (id === "clear") clearAll();
+  else if (id.startsWith("show:")) toggleShow(id.slice(5));
   else if (id === "reset") { for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; } placeAround(); }
   panelDirty = true;
 }
@@ -791,7 +887,7 @@ renderer.setAnimationLoop((t) => {
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
-window.__msh = { renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
+window.__msh = { hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
   btnWorld(id) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
     const v = new THREE.Vector3(((B.x + B.w / 2) / PW - 0.5) * 0.34, (0.5 - (B.y + B.h / 2) / PH) * 0.34 * PH / PW, 0); return panel.localToWorld(v).toArray(); },
   aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
