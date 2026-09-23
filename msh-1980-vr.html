@@ -370,7 +370,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.3";
+const VERSION = "VR 0.4";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -507,7 +507,8 @@ let HBASE = 0;                                                        // lowest 
 const pos3 = (x, y, z) => [x, z - HBASE, -y];                          // real (east, north, height) -> model coords
 
 let today, past, ground = "today", morph = 1;                          // morph: 0 = 1952 ground, 1 = today
-let terrain, overlay, overlayCtx, overlayImg, overlayTex, sides;
+let terrain, overlay, overlayCtx, overlayImg, overlayTex, sides, front = null;
+const FU = { uFront: { value: null }, uT: { value: 0 }, uCol: { value: new THREE.Color() } };
 const rToday = new Float32Array(RW * RH), rPast = new Float32Array(RW * RH);
 function sampleRender(src, dst) {
   for (let rj = 0; rj < RH; rj++) for (let ri = 0; ri < RW; ri++) {
@@ -537,6 +538,18 @@ function buildTerrain(imagery) {
   overlayTex = new THREE.CanvasTexture(oc); overlayTex.flipY = false; overlayTex.colorSpace = THREE.SRGBColorSpace;
   overlay = new THREE.Mesh(og, new THREE.MeshBasicMaterial({ map: overlayTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
   overlay.renderOrder = 1; model.add(overlay);
+  // the hazard that is playing: revealed smoothly from its arrival times by a shader
+  front = new THREE.Mesh(og, new THREE.ShaderMaterial({ uniforms: FU, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6,
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D uFront; uniform float uT; uniform vec3 uCol; varying vec2 vUv;
+      void main() { vec2 F = texture2D(uFront, vUv).rg; if (F.g < 0.02) discard;
+        float rev = smoothstep(F.r, F.r + 0.006, uT), main = smoothstep(0.6, 0.9, F.g);
+        float a = mix(90.0 / 255.0, 175.0 / 255.0, main) * smoothstep(0.1, 0.4, F.g) * rev; if (a < 0.004) discard;
+        float edge = 1.0 - smoothstep(0.0, 0.025, uT - F.r);
+        gl_FragColor = vec4(mix(uCol, vec3(1.0), 0.4 * edge * main), a);
+        #include <colorspace_fragment>
+      }` }));
+  front.renderOrder = 2; front.visible = false; model.add(front);
   // sides and base, so it reads as a model on the table
   const sp = [], si = [];
   const edge = (list) => { const start = sp.length / 3; list.forEach(k => { const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]; sp.push(x, y, z, x, -120, z); });
@@ -644,7 +657,7 @@ function toggleShow(k) {
   if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
   if (play && play.key === k) {                                     // end its playback at once, then repaint everything shown
     if (k === "aval") { applyMorph(1); ground = "today"; updateGroundButton(); }
-    info(`<b>${NAMES[k]}</b><br>${play.res.text}`); play = null; }
+    info(`<b>${NAMES[k]}</b><br>${play.res.text}`); play = null; front.visible = false; }
   paintAll(); flushOverlay();
   if (mudMesh) { mudMesh.visible = !hidden.has("lahar"); mudMesh.geometry.setDrawRange(0, Infinity); }
   if (coneMesh) coneMesh.visible = !hidden.has(coneMesh.userData.key);
@@ -694,29 +707,43 @@ function startHazard(key) {
     const res = runHazard(key);
     if (!res) { info(`<b>${NAMES[key]}</b><br>No valley found near the start point.`); return; }
     results[key] = res; hidden.delete(key); syncShow(); panelDirty = true;
-    paintAll(key); flushOverlay(); buildCone(res); buildMud(res);
+    paintAll(key); flushOverlay(); buildCone(res); buildMud(res); buildFront(res);
     if (key === "aval" || key === "blast") setGround("past", false); else setGround("today", false);
     play = { key, res, t0: performance.now(), shown: 0 };
     document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.h === key)));
   }, 30);
+}
+// Arrival texture for the playing hazard: R = when (0-1 of the playback), G = 0.5 danger zone, 1 the flow itself.
+// Squares just outside take their neighbour's time so the smooth edge doesn't creep outwards.
+function buildFront(res) {
+  const PF = res.prox ? 0.2 : 0, arr = new Float32Array(W * H).fill(Infinity), g = new Float32Array(W * H);
+  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = 0.5; });
+  const span = Math.max(1e-9, res.vmax - res.vmin);
+  res.cells.forEach((c, i) => { arr[c] = PF + (1 - PF) * (res.vals[i] - res.vmin) / span; g[c] = 1; });
+  const data = new Uint16Array(W * H * 2), toH = THREE.DataUtils.toHalfFloat;
+  for (let c = 0; c < W * H; c++) { let a = arr[c];
+    if (!isFinite(a)) { const i = c % W, j = (c / W) | 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj;
+      if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue; const v = arr[jj * W + ii]; if (v < a) a = v; } }
+    data[c * 2] = toH(isFinite(a) ? a : 2); data[c * 2 + 1] = toH(g[c]); }
+  if (FU.uFront.value) FU.uFront.value.dispose();
+  const t = new THREE.DataTexture(data, W, H, THREE.RGFormat, THREE.HalfFloatType); t.magFilter = t.minFilter = THREE.LinearFilter; t.flipY = false; t.needsUpdate = true;
+  FU.uFront.value = t; FU.uT.value = 0; FU.uCol.value.setRGB(...COLORS[res.key].map(v => v / 255), THREE.SRGBColorSpace); front.visible = true;
 }
 function stepPlay(now) {
   if (!play) return;
   const { key, res } = play, f = Math.min(1, (now - play.t0) / 1000 / DURATION);
   // first the danger zone fills outward from the summit, then the flow runs down the valley
   const PF = res.prox ? 0.2 : 0, fp = PF ? Math.min(1, f / PF) : 1, fm = PF ? Math.max(0, (f - PF) / (1 - PF)) : f;
-  if (res.prox) { const dcut = res.proxMax * fp; let m = play.proxShown || 0;
-    while (m < res.prox.length && res.proxD[m] <= dcut) { paintCell(res.prox[m], COLORS[key], 90); m++; }
-    if (m !== (play.proxShown || 0)) { play.proxShown = m; flushOverlay(); }
-    if (fp < 1) { if (key === "aval") applyMorph(f); return; }
-    if (!play.routeShown && res.route) { paintRoute(res.route, COLORS[key]); play.routeShown = true; } }
+  FU.uT.value = f;
+  if (res.prox) { if (fp < 1) { if (key === "aval") applyMorph(f); return; }
+    if (!play.routeShown && res.route) { paintRoute(res.route, COLORS[key]); flushOverlay(); play.routeShown = true; } }
   const vcut = res.vmin + (res.vmax - res.vmin) * fm; let n = play.shown;
-  while (n < res.cells.length && res.vals[n] <= vcut) { paintCell(res.cells[n], COLORS[key], 175); n++; }
-  if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); flushOverlay(); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
+  while (n < res.cells.length && res.vals[n] <= vcut) n++;
+  if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
   if (key === "aval") applyMorph(f);                                   // the mountain changes from 1952 to today's shape as the avalanche runs
   const clock = res.timed ? `Time since it started: <span id="clock">${fmtDur(vcut)}</span>` : "No reliable speed found for the avalanche, so it plays in order.";
   if (now - (play.lastInfo || 0) > 200 || f === 1) { info(`<b>${NAMES[key]}</b><br>${clock}${f === 1 ? "<br>" + res.text : ""}`); play.lastInfo = now; }
-  if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; }
+  if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; paintAll(); flushOverlay(); front.visible = false; }
 }
 function setGround(which, animate) {
   ground = which; updateGroundButton();
@@ -733,7 +760,7 @@ document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = (
 $("ground").onclick = () => { if (!past) return; setGround(ground === "past" ? "today" : "past", true); };
 $("clear").onclick = () => clearAll();
 document.querySelectorAll("#show button").forEach(b => b.onclick = () => toggleShow(b.dataset.s));
-function clearAll() { for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
+function clearAll() { for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; if (front) front.visible = false; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
 
 // ---------------- WebXR ----------------
 const xrBox = $("xr");
