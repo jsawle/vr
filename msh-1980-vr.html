@@ -374,7 +374,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.9";
+const VERSION = "VR 0.10";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -502,7 +502,7 @@ renderer.xr.enabled = true;
 const scene = new THREE.Scene();
 const bg = new THREE.Color(0x1c1b19); scene.background = bg;
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 50);
-camera.position.set(0.15, 0.75, 0.9);
+camera.position.set(0.1, 0.9, 1.2);
 const controls = new OrbitControls(camera, canvas); controls.target.set(0, 0.03, 0); controls.enableDamping = true;
 controls.minDistance = 0.15; controls.maxDistance = 3; controls.maxPolarAngle = Math.PI * 0.49;
 scene.add(new THREE.HemisphereLight(0xfff6e8, 0x40382e, 1.2));
@@ -1041,15 +1041,15 @@ function makeCallout(color, title, lines) {
   cx.font = "44px system-ui, sans-serif"; lines.forEach((t, i) => cx.fillText(t, 44, 74 + (i + 1) * lh + 6));
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, opacity: 0 }));
-  const w = 0.30 * PW2 / 1100, h = w * PHc / PW2; sp.scale.set(w, h, 1); sp.center.set(0.5, 0); sp.renderOrder = 21;
-  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]),
+  const w = 0.30, h = w * PHc / PW2; sp.scale.set(w, h, 1); sp.center.set(0.5, 0); sp.renderOrder = 21;
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]).setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 0], 3)),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false })); line.renderOrder = 21;
   const g = new THREE.Group(); g.add(line, sp); g.visible = false; callouts.add(g);
   return { g, sp, line };
 }
 function placeCallout(co, x, y, rise) {                                    // anchored on the ground at (x, y), label raised above it
   const a = new Float32Array(3), z = groundAt(x, y); tpos(x, y, z, a, 0);
-  const top = rise * SCALE * EXAG; co.g.position.set(a[0], a[1], a[2]); co.sp.position.set(0, top, 0); co.line.scale.set(1, top, 1);
+  co.anchor = new THREE.Vector3(a[0], a[1], a[2]); co.w0 = co.sp.scale.x; co.h0 = co.sp.scale.y; void rise;
 }
 function setCalloutOpacity(co, o) { co.g.visible = o > 0.01; co.sp.material.opacity = o; co.line.material.opacity = o * 0.9; }
 let dayCallouts = [];
@@ -1060,19 +1060,46 @@ function buildDayCallouts() {
   const along = (res, f) => cellXY(res.path[Math.min(res.path.length - 1, Math.floor(res.path.length * f))]);
   const add = (t, hold, color, title, lines, xy, rise) => { if (!xy) return; const co = makeCallout(color, title, lines); placeCallout(co, xy[0], xy[1], rise); dayCallouts.push({ t, hold, co }); };
   const [cx, cy] = craterXYZ, av = E("aval"), bl = E("blast"), la = E("lahar"), pf = E("pf");
-  if (av) add(8.5333, 7, HEX("aval"), "8:32 a.m.  Debris avalanche", ["2.5 km³ of rock slid away: the largest", "landslide in recorded history. It ran 23 km."], along(av.res, 0.55), 9000); dayCallouts[dayCallouts.length - 1].hold = 5;
-  if (bl) add(8.536, 7, HEX("blast"), "8:32 a.m.  Lateral blast", ["Hot rock, ash and gas at 480 km/h or more.", "600 km² of forest was flattened or scorched."], [cx, cy + 14000], 7000); if (bl) dayCallouts[dayCallouts.length - 1].hold = 5;
-  if (la) add(8.59, 7, HEX("lahar"), "8:35 a.m.  Lahars", ["Hot rock melted snow and ice. Mudflows poured", "down the valleys at up to 145 km/h."], along(la.res, 0.3), 7000);
-  add(9.0, 7, "#8a8680", "About 9 a.m.  Eruption column", ["Over 24 km high within 15 minutes.", "It lasted 9 hours. The wind blew the ash east."], [cx + 6000, cy], 14000);
-  if (pf) add(12.083, 7, HEX("pf"), "12:05 p.m.  Pyroclastic flows", ["Hot ash and pumice at 80–130 km/h,", "reaching about 8 km north of the crater."], [cx, cy + 5000], 7000);
-  if (nf) add(13.5, 8, HEX("lahar"), "About 1:30 p.m.  North Fork lahar", ["The biggest lahar, from water inside the avalanche", "deposit. It destroyed bridges and homes."], along(nf.res, 0.45), 7000);
-  add(15.0, 7, "#8a8680", "3–5 p.m.  The eruption at its strongest", ["Ash fell across the United States.", "Spokane, 400 km away, went completely dark."], [cx + 6000, cy], 14000);
-  add(18.3, 99, "#22201c", "18 May 1980", ["Sadly, 57 people lost their lives.", "More than 200 houses and cabins were destroyed."], [cx, cy - 3000], 9000);
+  const muddy = day.entries.find(e => e.res.valley === "muddy") || day.entries.find(e => e.res.valley === "pine") || la;
+  const ab = (deg, km) => [cx + Math.sin(deg * Math.PI / 180) * km * 1000, cy + Math.cos(deg * Math.PI / 180) * km * 1000];
+  // each card has its own part of the map: avalanche down the North Fork (west), blast to the north, flank lahars south-east,
+  // column over the crater, pyroclastic flows just north of it, North Fork lahar far west, the peak out east with the ash
+  if (av) add(8.5333, 5, HEX("aval"), "1 · 8:32 a.m.  Debris avalanche", ["2.5 km³ of rock slid away: the largest", "landslide in recorded history. It ran 23 km."], along(av.res, 0.8), 6000);
+  if (bl) add(8.536, 5, HEX("blast"), "2 · 8:32 a.m.  Lateral blast", ["Hot rock, ash and gas at 480 km/h or more.", "600 km² of forest was flattened or scorched."], ab(20, 17), 6000);
+  if (muddy) add(8.59, 6, HEX("lahar"), "3 · 8:35 a.m.  Lahars", ["Hot rock melted snow and ice. Mudflows poured", "down the valleys at up to 145 km/h."], along(muddy.res, 0.35), 6000);
+  add(9.0, 7, "#8a8680", "4 · About 9 a.m.  Eruption column", ["Over 24 km high within 15 minutes.", "It lasted 9 hours. The wind blew the ash east."], [cx, cy], 12000);
+  if (pf) add(12.083, 7, HEX("pf"), "5 · 12:05 p.m.  Pyroclastic flows", ["Hot ash and pumice at 80–130 km/h,", "reaching about 8 km north of the crater."], ab(0, 6), 5000);
+  if (nf) add(13.5, 8, HEX("lahar"), "6 · About 1:30 p.m.  North Fork lahar", ["The biggest lahar, from water inside the avalanche", "deposit. It destroyed bridges and homes."], along(nf.res, 0.6), 6000);
+  add(15.0, 7, "#8a8680", "7 · 3–5 p.m.  The eruption at its strongest", ["Ash fell across the United States.", "Spokane, 400 km away, went completely dark."], ab(ASH_BEARING, 26), 9000);
+  add(18.3, 99, "#22201c", "18 May 1980", ["Sadly, 57 people lost their lives.", "More than 200 houses and cabins were destroyed."], ab(180, 5), 7000);
 }
-function stepCallouts() {
-  if (day) { let prevEnd = -1e9; for (const c of dayCallouts) { const s0 = Math.max(daySec(c.t), prevEnd), age = day.sec - s0; prevEnd = s0 + c.hold;   // one at a time, in order
-      setCalloutOpacity(c.co, age < 0 || age > c.hold ? 0 : Math.min(1, age / 0.4, (c.hold - age) / 0.6)); } }
-  else for (const c of dayCallouts) setCalloutOpacity(c.co, 0);
+// Cards stay once shown, so the sequence can be read. They sit on a timeline rail beyond the far side of the table:
+// two rows of four, left to right in time order, each with a leader line down to where it happened. The rail turns to
+// stay on the far side and face you wherever you stand, so cards never cover one another.
+const RAIL = { cols: 4, gap: 0.325, rows: [0.30, 0.16], margin: 0.14 };
+let railAng = null;
+const _rv = new THREE.Vector3();
+function stepCallouts(dt) {
+  if (!day) { for (const c of dayCallouts) setCalloutOpacity(c.co, 0); return; }
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera; cam.getWorldPosition(_rv); table.worldToLocal(_rv);
+  const target = Math.atan2(_rv.x, _rv.z);                                   // direction from the table centre to you
+  if (railAng === null) railAng = target;
+  let dA = target - railAng; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); railAng += dA * Math.min(1, (dt || 0.016) * 3);
+  const dx = Math.sin(railAng), dz = Math.cos(railAng), rx = dz, rz = -dx;   // far side is -d; your right is (dz, -dx)
+  let prevEnd = -1e9, newest = -1;
+  dayCallouts.forEach((c, i) => { const s0 = Math.max(daySec(c.t), prevEnd); c.s0 = s0; prevEnd = s0 + Math.min(c.hold, 5); if (day.sec >= s0) newest = i; });
+  dayCallouts.forEach((c, i) => {
+    const co = c.co, age = day.sec - c.s0;
+    if (age < 0) { setCalloutOpacity(co, 0); return; }
+    const row = Math.floor(i / RAIL.cols), col = i % RAIL.cols, off = (col - (RAIL.cols - 1) / 2) * RAIL.gap;
+    const hw = (XMAX - XMIN) * SCALE / 2, hd = (YMAX - YMIN) * SCALE / 2, reach = Math.hypot(hw * dx, hd * dz) + RAIL.margin;   // just beyond the table's edge
+    const px = -dx * reach + rx * off, pz = -dz * reach + rz * off, py = RAIL.rows[Math.min(row, RAIL.rows.length - 1)];
+    const cur = i === newest, k = cur ? 1 : 0.9;
+    co.sp.scale.set(co.w0 * k, co.h0 * k, 1); co.sp.position.set(px, py, pz); co.g.position.set(0, 0, 0);
+    const pa = co.line.geometry.attributes.position; pa.setXYZ(0, px, py, pz); pa.setXYZ(1, co.anchor.x, co.anchor.y, co.anchor.z); pa.needsUpdate = true;
+    co.line.geometry.computeBoundingSphere();
+    setCalloutOpacity(co, Math.min(1, age / 0.4) * (cur ? 1 : 0.88));
+  });
 }
 const daySec = (h) => { let s = 0; for (const [a, b, d] of DSEG) { if (h <= b) return s + d * Math.max(0, h - a) / (b - a); s += d; } return DAY_S; };
 
@@ -1213,7 +1240,7 @@ function hitButton(c) {
 renderer.setAnimationLoop((t) => {
   const now = performance.now();
   const dtFx = Math.min(0.05, (now - (window.__lastFx || now)) / 1000); window.__lastFx = now;
-  stepPlay(now); stepDay(now); stepGround(now); stepEffects(dtFx); stepSound(); stepCallouts();
+  stepPlay(now); stepDay(now); stepGround(now); stepEffects(dtFx); stepSound(); stepCallouts(dtFx);
   if (renderer.xr.isPresenting) {
     if (needPlace) placeAround();
     let hv = -1; for (const c of ctrls) { const b = hitButton(c); if (b >= 0) hv = b; }
@@ -1247,7 +1274,11 @@ renderer.setAnimationLoop((t) => {
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
-window.__msh = { get day() { return day; }, dayButton, dayHours, DAY_S, fx(sec) { for (let t = 0; t < sec; t += 1 / 60) stepEffects(1 / 60); }, get cloudP() { return cloudP; }, get colP() { return colP; }, get colOn() { return colOn; }, snd, setColumn, hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
+const _cr = new THREE.Vector3(), _cu = new THREE.Vector3();
+window.__msh = { cardOverlaps() { const cam = camera; cam.updateMatrixWorld(); _cr.setFromMatrixColumn(cam.matrixWorld, 0).normalize(); _cu.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
+    const rs = dayCallouts.filter(c => c.co.g.visible).map(c => { const sp = c.co.sp; sp.updateMatrixWorld(); const wp = sp.getWorldPosition(new THREE.Vector3()), sc = table.scale.x, w = sp.scale.x * sc, h = sp.scale.y * sc;
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [a, b] of [[-0.5, 0], [0.5, 0], [-0.5, 1], [0.5, 1]]) { const v = wp.clone().addScaledVector(_cr, a * w).addScaledVector(_cu, b * h).project(cam); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); } return [x0, y0, x1, y1]; }); let n = 0;
+    for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const a = rs[i], b = rs[j]; if (a[0] < b[2] - 0.02 && a[2] > b[0] + 0.02 && a[1] < b[3] - 0.02 && a[3] > b[1] + 0.02) n++; } return { cards: rs.length, overlaps: n }; }, camera, controls, get day() { return day; }, dayButton, dayHours, DAY_S, fx(sec) { for (let t = 0; t < sec; t += 1 / 60) stepEffects(1 / 60); }, get cloudP() { return cloudP; }, get colP() { return colP; }, get colOn() { return colOn; }, snd, setColumn, hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
   btnWorld(id) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
     const v = new THREE.Vector3(((B.x + B.w / 2) / PW - 0.5) * 0.34, (0.5 - (B.y + B.h / 2) / PH) * 0.34 * PH / PW, 0); return panel.localToWorld(v).toArray(); },
   aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
