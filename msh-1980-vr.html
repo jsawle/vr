@@ -374,7 +374,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.8";
+const VERSION = "VR 0.9";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -470,7 +470,12 @@ async function loadImagery(progress, maxTex) {
 
 // Pre-1980 ground: USGS 1952 surface (msh-1952-dem.bin/json), blended into today's ground at its edges.
 async function loadPast(today) {
-  const [hdr, buf] = await Promise.all([fetch("msh-1952-dem.json").then(r => r.json()), fetch("msh-1952-dem.bin").then(r => r.arrayBuffer())]);
+  let hdr = null, buf = null;
+  for (const base of ["", "../curriculum_artifacts/", "https://jsawle.github.io/curriculum_artifacts/"]) {
+    try { const [a, b] = await Promise.all([fetch(base + "msh-1952-dem.json"), fetch(base + "msh-1952-dem.bin")]);
+      if (!a.ok || !b.ok) continue; hdr = await a.json(); buf = await b.arrayBuffer(); break; } catch (e) { /* try the next place */ }
+  }
+  if (!hdr) throw new Error("1952 surface not found");
   const raw = new Uint16Array(buf), n = hdr.W * hdr.H, z = new Float32Array(n), d = new Float32Array(n), Wd = hdr.W, Hd = hdr.H;
   for (let i = 0; i < n; i++) { z[i] = raw[i] ? raw[i] * hdr.scale : NaN; d[i] = raw[i] ? 1e9 : 0; }
   for (let j = 0; j < Hd; j++) for (let i = 0; i < Wd; i++) { const c = j * Wd + i; if (!d[c]) continue; let v = d[c];
@@ -619,7 +624,15 @@ function runHazard(key, valley) {
     for (let q = 0; q < W * H; q++) if (cl.mask[q]) { res.cells.push(q); res.vals.push(isFinite(r.distOf[q]) ? r.distOf[q] : r.length); }
     res.path = r.path; res.pathDist = r.pathDist; res.valley = valley;
     if (key === "lahar") { const T = laharTimes(r, h); res.T = T; res.vals = res.vals.map(T); } else res.timed = false;
-    if (r.proximalExit > 0) {
+    if (r.proximalExit > 0 && key === "lahar") {
+      // a lahar runs down its channel from high on the volcano: draw the path through the danger zone about 180 m wide
+      const seen = new Uint8Array(W * H), pd = [];
+      for (let p = 0; p <= r.proximalExit; p++) { const c = r.path[p], i = c % W, j = (c / W) | 0;
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue;
+          const q = jj * W + ii; if (!seen[q]) { seen[q] = 1; pd.push([q, r.pathDist[p]]); } } }
+      res.prox = pd.map(p => p[0]); res.proxD = pd.map(p => p[1]); res.proxMax = r.pathDist[r.proximalExit] || 1; res.channel = true;
+      res.route = r.path.slice(0, r.proximalExit + 1);
+    } else if (r.proximalExit > 0) {
       // danger zone mapped as Laharz_py does (ground below the H/L cone, cell by cell), only the slopes draining into this valley
       const z = HM.proximalZone(h, W, H, CELL, apex, 0.23, HM.catchment(N, W, H, r.path[r.proximalExit])), [ax, ay] = cellXY(apex), pd = [];
       for (let q = 0; q < W * H; q++) if (z[q]) { const [x, y] = cellXY(q); pd.push([q, Math.hypot(x - ax, y - ay)]); }
@@ -687,7 +700,7 @@ const hidden = new Set();
 function paintAll(except) {
   overlayImg.data.fill(0);
   for (const k of ["blast", "aval", "pf", "lahar"]) { const r = results[k]; if (!r || k === except || hidden.has(k)) continue;
-    if (r.prox) r.prox.forEach(c => paintCell(c, COLORS[k], 90)); if (r.route) paintRoute(r.route, COLORS[k]);
+    if (r.prox) r.prox.forEach(c => paintCell(c, COLORS[k], r.channel ? 175 : 90)); if (r.route && !r.channel) paintRoute(r.route, COLORS[k]);
     r.cells.forEach(c => paintCell(c, COLORS[k], 175));
   }
 }
@@ -759,7 +772,7 @@ function startHazard(key) {
 // Squares just outside take their neighbour's time so the smooth edge doesn't creep outwards.
 function frontTexture(res) {
   const PF = res.prox ? 0.2 : 0, arr = new Float32Array(W * H).fill(Infinity), g = new Float32Array(W * H);
-  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = 0.5; });
+  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = res.channel ? 1 : 0.5; });
   const span = Math.max(1e-9, res.vmax - res.vmin);
   res.cells.forEach((c, i) => { arr[c] = PF + (1 - PF) * (res.vals[i] - res.vmin) / span; g[c] = 1; });
   const data = new Uint16Array(W * H * 2), toH = THREE.DataUtils.toHalfFloat;
@@ -777,7 +790,7 @@ function makeFrontLayer(res) {
 }
 function buildFront(res) {
   const PF = res.prox ? 0.2 : 0, arr = new Float32Array(W * H).fill(Infinity), g = new Float32Array(W * H);
-  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = 0.5; });
+  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = res.channel ? 1 : 0.5; });
   const span = Math.max(1e-9, res.vmax - res.vmin);
   res.cells.forEach((c, i) => { arr[c] = PF + (1 - PF) * (res.vals[i] - res.vmin) / span; g[c] = 1; });
   const data = new Uint16Array(W * H * 2), toH = THREE.DataUtils.toHalfFloat;
@@ -798,7 +811,7 @@ function stepPlay(now) {
   play.pr = null;
   if (res.prox && fp < 1) { const dcut = res.proxMax * fp; let m = 0; while (m < res.prox.length && res.proxD[m] <= dcut) m++; play.pr = { lo: Math.max(0, m - 60), hi: m }; }
   if (res.prox) { if (fp < 1) { if (key === "aval") applyMorph(f); return; }
-    if (!play.routeShown && res.route) { paintRoute(res.route, COLORS[key]); flushOverlay(); play.routeShown = true; } }
+    if (!play.routeShown && res.route && !res.channel) { paintRoute(res.route, COLORS[key]); flushOverlay(); play.routeShown = true; } }
   const vcut = res.vmin + (res.vmax - res.vmin) * fm; let n = play.shown;
   while (n < res.cells.length && res.vals[n] <= vcut) n++;
   if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
@@ -966,7 +979,7 @@ function dayText(h) {
   if (h < 15) return "About 1:30 p.m. the biggest lahar, formed from water escaping the avalanche deposit, left the end of the deposit and swept down the North Fork Toutle.";
   if (h < 17) return "Between 3 and 5 p.m. the eruption was at its strongest.";
   if (h < 18.3) return "The column went on until the evening, about 9 hours in all. Spokane, 400 km east, was in complete darkness.";
-  return "The end of the day. Lahars destroyed more than 200 homes. Tap Play 18 May to watch it again.";
+  return "The end of the day. Sadly, 57 people lost their lives, and more than 200 houses and cabins were destroyed.";
 }
 async function prepareDay() {
   clearAll(); initSound();
@@ -986,7 +999,7 @@ async function prepareDay() {
       start = Math.max(12.5, 13.5 - t); }
     const L = makeFrontLayer(res); entries.push({ key: res.key, res, start, dur: Math.max(dur, 0.1), ...L });   // at least 6 minutes, so short flows are still seen
   }
-  day = { sec: 0, playing: true, entries, last: performance.now(), boomed: false };
+  day = { sec: 0, playing: true, entries, last: performance.now(), boomed: false }; buildDayCallouts();
   setGround("past", false); syncShow(); panelDirty = true; syncDayButton();
 }
 function endDay() {
@@ -1014,6 +1027,54 @@ function stepDay(now) {
 }
 function syncDayButton() { const t = !day ? "▶ Play 18 May" : day.playing ? "❚❚ Pause" : day.sec >= DAY_S ? "▶ Play again" : "▶ Play"; $("dayBtn").textContent = t; panelDirty = true; }
 function dayButton() { initSound(); if (!day || day.sec >= DAY_S) prepareDay(); else { day.playing = !day.playing; day.last = performance.now(); syncDayButton(); } }
+
+// ---------------- Pop-up callouts: what is happening, with key facts ----------------
+// Facts: USGS (1980 Cataclysmic Eruption; Impact and aftermath; Professional Paper 1250).
+const callouts = new THREE.Group(); callouts.renderOrder = 20; table.add(callouts);
+function makeCallout(color, title, lines) {
+  const meas = document.createElement("canvas").getContext("2d"); meas.font = "bold 58px system-ui, sans-serif"; let tw = meas.measureText(title).width;
+  meas.font = "44px system-ui, sans-serif"; for (const t of lines) tw = Math.max(tw, meas.measureText(t).width);
+  const PW2 = Math.ceil(tw + 90), lh = 54, PHc = 110 + lines.length * lh, cv = document.createElement("canvas"); cv.width = PW2; cv.height = PHc;
+  const cx = cv.getContext("2d"); cx.fillStyle = "rgba(255,253,248,0.94)"; cx.beginPath(); cx.roundRect(0, 0, PW2, PHc, 28); cx.fill();
+  cx.fillStyle = color; cx.fillRect(0, 0, 18, PHc);
+  cx.fillStyle = "#22201c"; cx.font = "bold 58px system-ui, sans-serif"; cx.fillText(title, 44, 74);
+  cx.font = "44px system-ui, sans-serif"; lines.forEach((t, i) => cx.fillText(t, 44, 74 + (i + 1) * lh + 6));
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, opacity: 0 }));
+  const w = 0.30 * PW2 / 1100, h = w * PHc / PW2; sp.scale.set(w, h, 1); sp.center.set(0.5, 0); sp.renderOrder = 21;
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false })); line.renderOrder = 21;
+  const g = new THREE.Group(); g.add(line, sp); g.visible = false; callouts.add(g);
+  return { g, sp, line };
+}
+function placeCallout(co, x, y, rise) {                                    // anchored on the ground at (x, y), label raised above it
+  const a = new Float32Array(3), z = groundAt(x, y); tpos(x, y, z, a, 0);
+  const top = rise * SCALE * EXAG; co.g.position.set(a[0], a[1], a[2]); co.sp.position.set(0, top, 0); co.line.scale.set(1, top, 1);
+}
+function setCalloutOpacity(co, o) { co.g.visible = o > 0.01; co.sp.material.opacity = o; co.line.material.opacity = o * 0.9; }
+let dayCallouts = [];
+const HEX = (k) => "#" + COLORS[k].map(v => v.toString(16).padStart(2, "0")).join("");
+function buildDayCallouts() {
+  for (const c of dayCallouts) callouts.remove(c.co.g); dayCallouts = [];
+  const E = (k) => day.entries.find(e => e.key === k && (k !== "lahar" || e.res.valley !== "nf")), nf = day.entries.find(e => e.res.valley === "nf");
+  const along = (res, f) => cellXY(res.path[Math.min(res.path.length - 1, Math.floor(res.path.length * f))]);
+  const add = (t, hold, color, title, lines, xy, rise) => { if (!xy) return; const co = makeCallout(color, title, lines); placeCallout(co, xy[0], xy[1], rise); dayCallouts.push({ t, hold, co }); };
+  const [cx, cy] = craterXYZ, av = E("aval"), bl = E("blast"), la = E("lahar"), pf = E("pf");
+  if (av) add(8.5333, 7, HEX("aval"), "8:32 a.m.  Debris avalanche", ["2.5 km³ of rock slid away: the largest", "landslide in recorded history. It ran 23 km."], along(av.res, 0.55), 9000); dayCallouts[dayCallouts.length - 1].hold = 5;
+  if (bl) add(8.536, 7, HEX("blast"), "8:32 a.m.  Lateral blast", ["Hot rock, ash and gas at 480 km/h or more.", "600 km² of forest was flattened or scorched."], [cx, cy + 14000], 7000); if (bl) dayCallouts[dayCallouts.length - 1].hold = 5;
+  if (la) add(8.59, 7, HEX("lahar"), "8:35 a.m.  Lahars", ["Hot rock melted snow and ice. Mudflows poured", "down the valleys at up to 145 km/h."], along(la.res, 0.3), 7000);
+  add(9.0, 7, "#8a8680", "About 9 a.m.  Eruption column", ["Over 24 km high within 15 minutes.", "It lasted 9 hours. The wind blew the ash east."], [cx + 6000, cy], 14000);
+  if (pf) add(12.083, 7, HEX("pf"), "12:05 p.m.  Pyroclastic flows", ["Hot ash and pumice at 80–130 km/h,", "reaching about 8 km north of the crater."], [cx, cy + 5000], 7000);
+  if (nf) add(13.5, 8, HEX("lahar"), "About 1:30 p.m.  North Fork lahar", ["The biggest lahar, from water inside the avalanche", "deposit. It destroyed bridges and homes."], along(nf.res, 0.45), 7000);
+  add(15.0, 7, "#8a8680", "3–5 p.m.  The eruption at its strongest", ["Ash fell across the United States.", "Spokane, 400 km away, went completely dark."], [cx + 6000, cy], 14000);
+  add(18.3, 99, "#22201c", "18 May 1980", ["Sadly, 57 people lost their lives.", "More than 200 houses and cabins were destroyed."], [cx, cy - 3000], 9000);
+}
+function stepCallouts() {
+  if (day) { let prevEnd = -1e9; for (const c of dayCallouts) { const s0 = Math.max(daySec(c.t), prevEnd), age = day.sec - s0; prevEnd = s0 + c.hold;   // one at a time, in order
+      setCalloutOpacity(c.co, age < 0 || age > c.hold ? 0 : Math.min(1, age / 0.4, (c.hold - age) / 0.6)); } }
+  else for (const c of dayCallouts) setCalloutOpacity(c.co, 0);
+}
+const daySec = (h) => { let s = 0; for (const [a, b, d] of DSEG) { if (h <= b) return s + d * Math.max(0, h - a) / (b - a); s += d; } return DAY_S; };
 
 // ---------------- HTML controls ----------------
 document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = () => startHazard(b.dataset.h));
@@ -1152,7 +1213,7 @@ function hitButton(c) {
 renderer.setAnimationLoop((t) => {
   const now = performance.now();
   const dtFx = Math.min(0.05, (now - (window.__lastFx || now)) / 1000); window.__lastFx = now;
-  stepPlay(now); stepDay(now); stepGround(now); stepEffects(dtFx); stepSound();
+  stepPlay(now); stepDay(now); stepGround(now); stepEffects(dtFx); stepSound(); stepCallouts();
   if (renderer.xr.isPresenting) {
     if (needPlace) placeAround();
     let hv = -1; for (const c of ctrls) { const b = hitButton(c); if (b >= 0) hv = b; }
