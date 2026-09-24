@@ -27,6 +27,8 @@
   .grid4 button { font-size: 12px; padding: 6px 6px; }
   .grid4 button[aria-pressed="false"]:not(:disabled) { opacity: .55; }
   .grid4 button[aria-pressed="true"] { outline: none; }
+  #colBtn[aria-pressed="false"], #soundBtn[aria-pressed="false"] { opacity: .55; }
+  #colBtn[aria-pressed="true"], #soundBtn[aria-pressed="true"] { outline: none; }
   button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); text-align: left; }
   button .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
   button[aria-pressed="true"] { outline: 2px solid var(--accent); }
@@ -62,6 +64,7 @@
     <button id="ground">Ground: today</button>
     <button id="clear">Clear</button>
   </div>
+  <div class="grid" style="margin-top:6px"><button id="colBtn" aria-pressed="false">Eruption column</button><button id="soundBtn" aria-pressed="true">Sound</button></div>
   <div id="show" class="grid4" aria-label="Show on the map">
     <button data-s="aval" disabled aria-pressed="false"><span class="sw" style="background:#8a5a2b"></span>Aval.</button>
     <button data-s="blast" disabled aria-pressed="false"><span class="sw" style="background:#6d28d9"></span>Blast</button>
@@ -370,7 +373,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.6";
+const VERSION = "VR 0.7";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -742,6 +745,7 @@ function startHazard(key) {
     paintAll(key); flushOverlay(); buildCone(res); buildMud(res); buildFront(res);
     if (key === "aval" || key === "blast") setGround("past", false); else setGround("today", false);
     play = { key, res, t0: performance.now(), shown: 0 };
+    initSound(); if (key === "blast") boom(1.0); if (key === "aval") boom(0.6); if (key === "pf" && !colOn) setColumn(true);
     document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.h === key)));
   }, 30);
 }
@@ -767,15 +771,19 @@ function stepPlay(now) {
   // first the danger zone fills outward from the summit, then the flow runs down the valley
   const PF = res.prox ? 0.2 : 0, fp = PF ? Math.min(1, f / PF) : 1, fm = PF ? Math.max(0, (f - PF) / (1 - PF)) : f;
   FU.uT.value = f;
+  play.pr = null;
+  if (res.prox && fp < 1) { const dcut = res.proxMax * fp; let m = 0; while (m < res.prox.length && res.proxD[m] <= dcut) m++; play.pr = { lo: Math.max(0, m - 60), hi: m }; }
   if (res.prox) { if (fp < 1) { if (key === "aval") applyMorph(f); return; }
     if (!play.routeShown && res.route) { paintRoute(res.route, COLORS[key]); flushOverlay(); play.routeShown = true; } }
   const vcut = res.vmin + (res.vmax - res.vmin) * fm; let n = play.shown;
   while (n < res.cells.length && res.vals[n] <= vcut) n++;
   if (n !== play.shown || play.shown === 0) { play.shown = Math.max(n, 1); if (mudMesh) mudMesh.geometry.setDrawRange(0, n * 6); }
+  play.fr = { lo: Math.max(0, n - Math.max(40, Math.round(res.cells.length * 0.03))), hi: n };
   if (key === "aval") applyMorph(f);                                   // the mountain changes from 1952 to today's shape as the avalanche runs
   const clock = res.timed ? `Time since it started: <span id="clock">${fmtDur(vcut)}</span>` : "No reliable speed found for the avalanche, so it plays in order.";
   if (now - (play.lastInfo || 0) > 200 || f === 1) { info(`<b>${NAMES[key]}</b><br>${clock}${f === 1 ? "<br>" + res.text : ""}`); play.lastInfo = now; }
-  if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; paintAll(); flushOverlay(); front.visible = false; }
+  if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; paintAll(); flushOverlay(); front.visible = false;
+    if (key === "blast" && !colOn) { setColumn(true); info(`<b>${NAMES[key]}</b><br>${res.text}<br>Less than an hour later, a column of ash rose more than 24 km high.`); } }
 }
 function setGround(which, animate) {
   ground = which; updateGroundButton();
@@ -787,12 +795,140 @@ let groundAnim = null;
 function stepGround(now) { if (!groundAnim) return; const f = Math.min(1, (now - groundAnim.t0) / 2500); applyMorph(groundAnim.from + (groundAnim.to - groundAnim.from) * f); if (f === 1) groundAnim = null; }
 function updateGroundButton() { $("ground").textContent = ground === "past" ? "Ground: 1952 (before)" : "Ground: today"; panelDirty = true; }
 
+// ---------------- Eruption effects: clouds, the eruption column, sound ----------------
+// USGS: at 8:32 the north side collapsed and the blast overtook the avalanche; less than an hour later a Plinian column rose
+// more than 24 km within 15 minutes and continued for 9 hours; pyroclastic flows from just after noon; the wind blew the ash
+// east (complete darkness in Spokane, 400 km away). Cloud shapes, heights and particle speeds are illustrations.
+const ASH_BEARING = 66;                                        // towards Spokane
+const tpos = (x, y, z, out, o) => { out[o] = x * SCALE; out[o + 1] = (z - HBASE) * SCALE * EXAG; out[o + 2] = -y * SCALE; };
+const rnd = (a, b) => a + Math.random() * (b - a);
+let craterXYZ = [0, 0, 0], colOn = false, cloudP = null, colP = null;
+const PART_FRAG = `varying vec2 vUv; varying vec4 vD; varying vec3 vC;
+  void main() { float r = length(vUv - 0.5) * 2.0; float a = smoothstep(1.0, 0.25, r) * vD.y; if (a < 0.01) discard;
+    vec3 c = vC * (0.72 + 0.5 * vUv.y + 0.12 * vD.w); c = mix(c, vec3(1.0, 0.45, 0.12), vD.z); gl_FragColor = vec4(c, a);
+    #include <colorspace_fragment>
+  }`;
+function makeParticles(n) {
+  const base = new THREE.PlaneGeometry(1, 1), geo = new THREE.InstancedBufferGeometry();
+  geo.index = base.index; geo.setAttribute("position", base.attributes.position); geo.setAttribute("uv", base.attributes.uv);
+  const P = new Float32Array(n * 3), D = new Float32Array(n * 4), C = new Float32Array(n * 3);
+  const pa = new THREE.InstancedBufferAttribute(P, 3), da = new THREE.InstancedBufferAttribute(D, 4), ca = new THREE.InstancedBufferAttribute(C, 3);
+  for (const a of [pa, da, ca]) a.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("iPos", pa); geo.setAttribute("iData", da); geo.setAttribute("iCol", ca); geo.instanceCount = n;
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uS: { value: SCALE } },
+    vertexShader: `attribute vec3 iPos; attribute vec4 iData; attribute vec3 iCol; uniform float uS; varying vec2 vUv; varying vec4 vD; varying vec3 vC;
+      void main() { vUv = uv; vD = iData; vC = iCol; vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
+        float s = iData.x * uS * length(modelMatrix[0].xyz); mv.xy += position.xy * s; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: PART_FRAG });
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 6; table.add(mesh);
+  return { n, P, D, C, pa, da, ca, mesh, next: 0, acc: 0, x: new Float32Array(n), y: new Float32Array(n), z: new Float32Array(n),
+    vx: new Float32Array(n), vy: new Float32Array(n), vz: new Float32Array(n), age: new Float32Array(n).fill(1e9), life: new Float32Array(n),
+    s0: new Float32Array(n), s1: new Float32Array(n), a0: new Float32Array(n), st: new Uint8Array(n), top: new Float32Array(n) };
+}
+const groundAt = (x, y) => { const i = Math.floor((x - XMIN) / CELL), j = Math.floor((YMAX - y) / CELL); if (i < 0 || j < 0 || i >= W || j >= H) return HBASE;
+  const c = j * W + i; return past[c] + (today[c] - past[c]) * morph; };
+const edgeFade = (x, y) => Math.min(1, Math.min(x - XMIN, XMAX - x, y - YMIN, YMAX - y) / 3000);
+function emit(p, x, y, z, vx, vy, vz, life, s0, s1, a0, col, heat) {
+  const k = p.next; p.next = (k + 1) % p.n;
+  p.x[k] = x; p.y[k] = y; p.z[k] = z; p.vx[k] = vx; p.vy[k] = vy; p.vz[k] = vz; p.age[k] = 0; p.life[k] = life; p.s0[k] = s0; p.s1[k] = s1; p.a0[k] = a0; p.st[k] = 0;
+  p.C.set(col, k * 3); p.D[k * 4 + 2] = heat; p.D[k * 4 + 3] = Math.random(); return k;
+}
+const CLOUD = { aval: [0.46, 0.37, 0.27], blast: [0.20, 0.19, 0.19], pf: [0.55, 0.54, 0.52] };
+// clouds rising from the moving front of the playing hazard
+function frontCell() {
+  if (!play) return -1; const res = play.res;
+  if (play.pr && play.pr.hi > play.pr.lo) return res.prox[play.pr.lo + Math.floor(Math.random() * (play.pr.hi - play.pr.lo))];
+  if (play.fr && play.fr.hi > play.fr.lo) return res.cells[play.fr.lo + Math.floor(Math.random() * (play.fr.hi - play.fr.lo))];
+  return -1;
+}
+function stepEffects(dt) {
+  if (!cloudP) return;
+  // 1. clouds from the front
+  if (play && CLOUD[play.key] && !hidden.has(play.key)) {
+    const key = play.key, rate = key === "blast" ? 420 : key === "aval" ? 220 : 200, [vx0, vy0] = craterXYZ;
+    cloudP.acc += rate * dt;
+    while (cloudP.acc >= 1) { cloudP.acc--; const c = frontCell(); if (c < 0) break; const [x, y] = cellXY(c), g = groundAt(x, y);
+      const dx = x - vx0, dy = y - vy0, d = Math.max(1, Math.hypot(dx, dy)), out = key === "blast" ? rnd(200, 500) : rnd(40, 160);
+      emit(cloudP, x + rnd(-80, 80), y + rnd(-80, 80), g + rnd(20, key === "blast" ? 400 : 150), dx / d * out, dy / d * out,
+        key === "blast" ? rnd(150, 420) : key === "pf" ? rnd(200, 500) : rnd(60, 200), key === "blast" ? rnd(2.5, 3.5) : rnd(2, 3.2),
+        key === "aval" ? 300 : 600, key === "blast" ? 3000 : key === "pf" ? 2200 : 1300, key === "aval" ? 0.55 : 0.7, CLOUD[key], key === "aval" ? 0 : rnd(0.0, 0.12)); }
+  }
+  // 2. the eruption column
+  if (colOn) { colP.acc += 260 * dt;
+    while (colP.acc >= 1) { colP.acc--; const a = rnd(0, Math.PI * 2), r = rnd(0, 300);
+      const k = emit(colP, craterXYZ[0] + Math.cos(a) * r, craterXYZ[1] + Math.sin(a) * r, craterXYZ[2] + 50, rnd(-80, 80), rnd(-80, 80), 24000 / rnd(2.2, 3.2), rnd(9, 12), 1200, 5000, 0.55, [0.40, 0.39, 0.37], 0.05);
+      colP.top[k] = 24000 * rnd(0.85, 1.05); } }
+  const wx = Math.sin(ASH_BEARING * Math.PI / 180) * 2600, wy = Math.cos(ASH_BEARING * Math.PI / 180) * 2600;
+  for (const p of [cloudP, colP]) {
+    for (let k = 0; k < p.n; k++) { const o = k * 4; if (p.age[k] > p.life[k]) { p.D[o + 1] = 0; continue; }
+      p.age[k] += dt;
+      if (p === colP) {                                              // rise, spread under the top, drift east with the wind
+        const ztop = craterXYZ[2] + p.top[k];
+        if (p.st[k] === 0 && p.z[k] >= ztop) { p.st[k] = 1; const a = Math.atan2(p.y[k] - craterXYZ[1], p.x[k] - craterXYZ[0]) + rnd(-0.7, 0.7);
+          p.vx[k] = Math.cos(a) * rnd(600, 1600); p.vy[k] = Math.sin(a) * rnd(600, 1600); p.vz[k] = -rnd(300, 700); }
+        if (p.st[k] === 1) { p.vx[k] += (wx - p.vx[k]) * Math.min(1, dt * 0.6); p.vy[k] += (wy - p.vy[k]) * Math.min(1, dt * 0.6); }
+        else { p.vx[k] += wx * 0.08 * dt; p.vy[k] += wy * 0.08 * dt; }
+      } else { p.vx[k] *= 1 - 0.8 * dt; p.vy[k] *= 1 - 0.8 * dt; p.vz[k] *= 1 - 0.5 * dt; }
+      p.x[k] += p.vx[k] * dt; p.y[k] += p.vy[k] * dt; p.z[k] += p.vz[k] * dt;
+      const f = p.age[k] / p.life[k], fade = edgeFade(p.x[k], p.y[k]);
+      if (fade <= 0) { p.age[k] = 1e9; p.D[o + 1] = 0; continue; }
+      tpos(p.x[k], p.y[k], p.z[k], p.P, k * 3);
+      p.D[o] = p.s0[k] + (p.s1[k] - p.s0[k]) * Math.sqrt(f);
+      p.D[o + 1] = p.a0[k] * Math.min(1, p.age[k] / 0.25) * (1 - Math.max(0, (f - 0.6) / 0.4)) * fade;
+      p.D[o + 2] *= 1 - 1.5 * dt;
+    }
+    p.pa.needsUpdate = p.da.needsUpdate = p.ca.needsUpdate = true;
+  }
+}
+function setColumn(v) { colOn = v; $("colBtn").setAttribute("aria-pressed", String(v)); panelDirty = true;
+  if (v && !play) info("<b>Eruption column</b><br>Less than an hour after the collapse, a column of ash rose more than 24 km in under 15 minutes. It went on for 9 hours, strongest between 3 and 5 p.m. The wind blew the ash east: Spokane, 400 km away, went completely dark."); }
+
+// Sound, made in the browser (no audio files), placed in the room
+const snd = { ctx: null, on: true };
+function initSound() {
+  if (snd.ctx) { if (snd.ctx.state !== "running") snd.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const ctx = new AC(); snd.ctx = ctx; const master = ctx.createGain(); master.gain.value = snd.on ? 0.9 : 0; master.connect(ctx.destination); snd.master = master;
+  const noise = (sec, brown) => { const b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate), d = b.getChannelData(0); let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; } return b; };
+  const panner = () => { const p = ctx.createPanner(); p.panningModel = "HRTF"; p.distanceModel = "inverse"; p.refDistance = 0.4; p.rolloffFactor = 1; p.connect(master); return p; };
+  snd.volcanoPan = panner(); snd.frontPan = panner();
+  const loop = (buf, type, freq, q, pan) => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = ctx.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(pan); s.start(); return g; };
+  const brown = noise(4, true), white = noise(2, false); snd.white = white;
+  snd.rumble = loop(brown, "lowpass", 110, 0.7, snd.volcanoPan);     // the volcano
+  snd.roar = loop(white, "bandpass", 380, 0.6, snd.volcanoPan);      // the eruption column
+  snd.rush = loop(brown, "lowpass", 420, 0.5, snd.frontPan);         // the moving avalanche, blast or flows
+}
+function boom(gain) { const ctx = snd.ctx; if (!ctx) return; const t = ctx.currentTime + 0.02, s = ctx.createBufferSource(); s.buffer = snd.white;
+  const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160; const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+  s.connect(f); f.connect(g); g.connect(snd.volcanoPan); s.start(t, 0, 3.1); }
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _f = new THREE.Vector3(), _u = new THREE.Vector3();
+function panTo(p, x, y, z) { const a = new Float32Array(3); tpos(x, y, z, a, 0); _v.set(a[0], a[1], a[2]); table.localToWorld(_v); p.positionX.value = _v.x; p.positionY.value = _v.y; p.positionZ.value = _v.z; }
+function stepSound() {
+  const ctx = snd.ctx; if (!ctx || !cloudP) return;
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera; cam.getWorldPosition(_v); cam.getWorldQuaternion(_q);
+  _f.set(0, 0, -1).applyQuaternion(_q); _u.set(0, 1, 0).applyQuaternion(_q); const L = ctx.listener;
+  if (L.positionX) { L.positionX.value = _v.x; L.positionY.value = _v.y; L.positionZ.value = _v.z; L.forwardX.value = _f.x; L.forwardY.value = _f.y; L.forwardZ.value = _f.z; L.upX.value = _u.x; L.upY.value = _u.y; L.upZ.value = _u.z; }
+  snd.volcanoPan.refDistance = snd.frontPan.refDistance = 0.4 * table.scale.x;
+  panTo(snd.volcanoPan, craterXYZ[0], craterXYZ[1], craterXYZ[2]);
+  const c = frontCell(); if (c >= 0) { const [x, y] = cellXY(c); panTo(snd.frontPan, x, y, groundAt(x, y)); }
+  const t = ctx.currentTime, k = play ? play.key : null, playing = k && CLOUD[k] && !hidden.has(k);
+  snd.rumble.gain.setTargetAtTime(colOn ? 0.55 : playing ? 0.35 : 0, t, 0.3);
+  snd.roar.gain.setTargetAtTime(colOn ? 0.4 : 0, t, 0.5);
+  snd.rush.gain.setTargetAtTime(playing ? (k === "blast" ? 1.0 : 0.7) : 0, t, 0.25);
+}
+function setSound(v) { snd.on = v; $("soundBtn").setAttribute("aria-pressed", String(v)); if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); panelDirty = true; }
+
 // ---------------- HTML controls ----------------
 document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = () => startHazard(b.dataset.h));
 $("ground").onclick = () => { if (!past) return; setGround(ground === "past" ? "today" : "past", true); };
 $("clear").onclick = () => clearAll();
+$("colBtn").onclick = () => { initSound(); setColumn(!colOn); };
+$("soundBtn").onclick = () => setSound(!snd.on);
 document.querySelectorAll("#show button").forEach(b => b.onclick = () => toggleShow(b.dataset.s));
-function clearAll() { for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; if (front) front.visible = false; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
+function clearAll() { setColumn(false); for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; if (front) front.visible = false; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
 
 // ---------------- WebXR ----------------
 const xrBox = $("xr");
@@ -820,7 +956,7 @@ renderer.xr.addEventListener("sessionend", () => {
 });
 
 // Floating 3D menu
-const PW = 1024, PH = 1300, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
+const PW = 1024, PH = 1420, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
 const pctx = panelCanvas.getContext("2d"), panelTex = new THREE.CanvasTexture(panelCanvas); panelTex.colorSpace = THREE.SRGBColorSpace;
 const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34 * PH / PW), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true }));
 panel.visible = false; scene.add(panel);
@@ -832,6 +968,7 @@ addBtn("pf", "3 Pyroclastic flows", 40, 280, 460, 110, "#dc2626"); addBtn("lahar
 addBtn("valley", "", 40, 410, 944, 90); addBtn("ground", "", 40, 520, 944, 90);
 addBtn("smaller", "Smaller", 40, 630, 300, 90); addBtn("bigger", "Bigger", 362, 630, 300, 90); addBtn("rotate", "Turn", 684, 630, 300, 90);
 addBtn("clear", "Clear", 40, 740, 460, 90); addBtn("reset", "Reset table", 524, 740, 460, 90);
+addBtn("column", "Eruption column", 40, 1000, 580, 90); addBtn("sound", "Sound", 644, 1000, 340, 90);
 // show / hide each hazard once it has been run
 [["aval", "Avalanche", "#8a5a2b"], ["blast", "Blast", "#6d28d9"], ["pf", "Pyro. flows", "#dc2626"], ["lahar", "Lahar", "#0e7490"]]
   .forEach(([k, name, col], n) => addBtn("show:" + k, name, 40 + n * 238, 890, 224, 90, col));
@@ -852,10 +989,11 @@ function drawPanel() {
     pctx.fillStyle = b === hover ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
     if (play && play.key === B.id) { pctx.strokeStyle = "#b4381c"; pctx.lineWidth = 8; roundRect(B.x, B.y, B.w, B.h, 20); pctx.stroke(); }
     let tx = B.x + 28; if (B.color) { pctx.fillStyle = B.color; pctx.fillRect(B.x + 26, B.y + B.h / 2 - 14, 28, 28); tx += 44; }
-    pctx.fillStyle = "#22201c"; pctx.font = "600 44px system-ui, sans-serif"; pctx.fillText(label, tx, B.y + B.h / 2 + 15);
+    pctx.globalAlpha = (B.id === "column" && !colOn) || (B.id === "sound" && !snd.on) ? 0.45 : 1;
+    pctx.fillStyle = "#22201c"; pctx.font = "600 44px system-ui, sans-serif"; pctx.fillText(label, tx, B.y + B.h / 2 + 15); pctx.globalAlpha = 1;
   }
   pctx.fillStyle = "#22201c"; pctx.font = "40px system-ui, sans-serif";
-  wrap(panelInfo, 40, 1040, PW - 80, 52);
+  wrap(panelInfo, 40, 1160, PW - 80, 52);
   pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 40);
   panelTex.needsUpdate = true; panelDirty = false;
 }
@@ -884,6 +1022,8 @@ function pressButton(id) {
   else if (id === "bigger") table.scale.multiplyScalar(1.25);
   else if (id === "rotate") table.rotateY(Math.PI / 4);
   else if (id === "clear") clearAll();
+  else if (id === "column") { initSound(); setColumn(!colOn); }
+  else if (id === "sound") setSound(!snd.on);
   else if (id.startsWith("show:")) toggleShow(id.slice(5));
   else if (id === "reset") { for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; } placeAround(); }
   panelDirty = true;
@@ -916,7 +1056,8 @@ function hitButton(c) {
 // ---------------- Render loop ----------------
 renderer.setAnimationLoop((t) => {
   const now = performance.now();
-  stepPlay(now); stepGround(now);
+  const dtFx = Math.min(0.05, (now - (window.__lastFx || now)) / 1000); window.__lastFx = now;
+  stepPlay(now); stepGround(now); stepEffects(dtFx); stepSound();
   if (renderer.xr.isPresenting) {
     if (needPlace) placeAround();
     let hv = -1; for (const c of ctrls) { const b = hitButton(c); if (b >= 0) hv = b; }
@@ -940,13 +1081,17 @@ renderer.setAnimationLoop((t) => {
     try { past = await loadPast(today); } catch (e) { console.warn("No 1952 ground", e); past = today; $("ground").disabled = true; }
     sampleRender(today, rToday); sampleRender(past, rPast);
     buildTerrain(img);
-    $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles (USGS 3DEP, SRTM)", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Pre-1980 ground: USGS (Bard & Phillips-Netherton, 2024). Imagery: Esri World Imagery. Heights ×${EXAG}. ${VERSION}`;
+    { let c = idxOf(-122.1890, 46.1990), bz = today[c]; const ci = c % W, cj = (c / W) | 0;
+      for (let dj = -8; dj <= 8; dj++) for (let di = -8; di <= 8; di++) { const q = (cj + dj) * W + ci + di; if (today[q] < bz) { bz = today[q]; c = q; } }
+      const [cx, cy] = cellXY(c); craterXYZ = [cx, cy, bz]; }
+    cloudP = makeParticles(3000); colP = makeParticles(2800); colP.mesh.renderOrder = 7;
+    $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles (USGS 3DEP, SRTM)", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Pre-1980 ground: USGS (Bard & Phillips-Netherton, 2024). Imagery: Esri World Imagery. Heights ×${EXAG}; the eruption column is drawn to the same scale. Clouds and sound are illustrations. ${VERSION}`;
     info("Ready. Pick a hazard.");
     console.info("MSH VR", VERSION, { grid: [W, H], elevation: el.source });
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
-window.__msh = { hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
+window.__msh = { fx(sec) { for (let t = 0; t < sec; t += 1 / 60) stepEffects(1 / 60); }, get cloudP() { return cloudP; }, get colP() { return colP; }, get colOn() { return colOn; }, snd, setColumn, hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
   btnWorld(id) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
     const v = new THREE.Vector3(((B.x + B.w / 2) / PW - 0.5) * 0.34, (0.5 - (B.y + B.h / 2) / PH) * 0.34 * PH / PW, 0); return panel.localToWorld(v).toArray(); },
   aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
