@@ -27,8 +27,9 @@
   .grid4 button { font-size: 12px; padding: 6px 6px; }
   .grid4 button[aria-pressed="false"]:not(:disabled) { opacity: .55; }
   .grid4 button[aria-pressed="true"] { outline: none; }
-  #colBtn[aria-pressed="false"], #soundBtn[aria-pressed="false"] { opacity: .55; }
-  #colBtn[aria-pressed="true"], #soundBtn[aria-pressed="true"] { outline: none; }
+  #soundBtn[aria-pressed="false"] { opacity: .55; }
+  #soundBtn[aria-pressed="true"] { outline: none; }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
   button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); text-align: left; }
   button .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
   button[aria-pressed="true"] { outline: 2px solid var(--accent); }
@@ -64,7 +65,7 @@
     <button id="ground">Ground: today</button>
     <button id="clear">Clear</button>
   </div>
-  <div class="grid" style="margin-top:6px"><button id="colBtn" aria-pressed="false">Eruption column</button><button id="soundBtn" aria-pressed="true">Sound</button></div>
+  <div class="grid" style="margin-top:6px"><button id="dayBtn" class="primary">▶ Play 18 May</button><button id="soundBtn" aria-pressed="true">Sound</button></div>
   <div id="show" class="grid4" aria-label="Show on the map">
     <button data-s="aval" disabled aria-pressed="false"><span class="sw" style="background:#8a5a2b"></span>Aval.</button>
     <button data-s="blast" disabled aria-pressed="false"><span class="sw" style="background:#6d28d9"></span>Blast</button>
@@ -373,7 +374,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.7";
+const VERSION = "VR 0.8";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;
@@ -382,7 +383,7 @@ const info = (html) => { $("info").innerHTML = html; panelDirty = true; panelInf
 
 // ---------------- Area and grids ----------------
 // Mount St Helens and the upper North Fork Toutle valley. Local metres: x east, y north (Three.js z = -y).
-const AREA = { lonMin: -122.50, lonMax: -122.05, latMin: 46.12, latMax: 46.34 };
+const AREA = { lonMin: -122.95, lonMax: -121.95, latMin: 46.04, latMax: 46.48 };   // big enough for the whole blast, the North Fork lahar and the south-side lahars
 const LON0 = (AREA.lonMin + AREA.lonMax) / 2, LAT0 = (AREA.latMin + AREA.latMax) / 2;
 const KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 111132;
 const toXY = (lon, lat) => [(lon - LON0) * KX, (lat - LAT0) * KY];
@@ -392,7 +393,7 @@ const CELL = 60;                                             // model grid (m)
 const W = Math.floor((XMAX - XMIN) / CELL), H = Math.floor((YMAX - YMIN) / CELL);
 const cellXY = (c) => [XMIN + (c % W + 0.5) * CELL, YMAX - (((c / W) | 0) + 0.5) * CELL];
 const idxOf = (lon, lat) => { const [x, y] = toXY(lon, lat); const i = Math.floor((x - XMIN) / CELL), j = Math.floor((YMAX - y) / CELL); return (i < 0 || j < 0 || i >= W || j >= H) ? -1 : j * W + i; };
-const RS = 2;                                                // render mesh: every 2nd grid cell (120 m)
+const RS = 3;                                                // render mesh: every 3rd grid cell (180 m), light enough for the headset
 const RW = Math.floor(W / RS) + 1, RH = Math.floor(H / RS) + 1;
 const EXAG = 1.5;                                            // vertical exaggeration on the table
 
@@ -449,8 +450,11 @@ async function loadElevation(progress) {
 }
 
 // Imagery: Esri World Imagery tiles stitched into one texture.
-const IMG_Z = 13;
-async function loadImagery(progress) {
+let IMG_Z = 13;
+async function loadImagery(progress, maxTex) {
+  const fit = (z) => { const [a, b] = tileXY(AREA.lonMin, AREA.latMax, z), [c, d] = tileXY(AREA.lonMax, AREA.latMin, z);
+    return (Math.floor(c) - Math.floor(a) + 1) * 256 <= maxTex && (Math.floor(d) - Math.floor(b) + 1) * 256 <= maxTex; };
+  IMG_Z = fit(13) ? 13 : 12;
   const [x0f, y0f] = tileXY(AREA.lonMin, AREA.latMax, IMG_Z), [x1f, y1f] = tileXY(AREA.lonMax, AREA.latMin, IMG_Z);
   const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
   const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256;
@@ -501,7 +505,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-0.6, 1.
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 // The table model: 1 unit = 1 m on the table. Inside, positions are real metres scaled down.
-const TABLE_WIDTH = 1.0;
+const TABLE_WIDTH = 1.2;
 const table = new THREE.Group(); scene.add(table);
 const model = new THREE.Group(); table.add(model);
 const SCALE = TABLE_WIDTH / (XMAX - XMIN);
@@ -510,7 +514,7 @@ let HBASE = 0;                                                        // lowest 
 const pos3 = (x, y, z) => [x, z - HBASE, -y];                          // real (east, north, height) -> model coords
 
 let today, past, ground = "today", morph = 1;                          // morph: 0 = 1952 ground, 1 = today
-let terrain, overlay, overlayCtx, overlayImg, overlayTex, sides, front = null;
+let terrain, overlay, overlayCtx, overlayImg, overlayTex, sides, front = null, ovGeo = null;
 const FU = { uFront: { value: null }, uT: { value: 0 }, uCol: { value: new THREE.Color() } };
 const rToday = new Float32Array(RW * RH), rPast = new Float32Array(RW * RH);
 function sampleRender(src, dst) {
@@ -552,7 +556,7 @@ function buildTerrain(imagery) {
         gl_FragColor = vec4(mix(uCol, vec3(1.0), 0.4 * edge * main), a);
         #include <colorspace_fragment>
       }` }));
-  front.renderOrder = 2; front.visible = false; model.add(front);
+  front.renderOrder = 2; front.visible = false; model.add(front); ovGeo = og;
   // sides and base, so it reads as a model on the table
   const sp = [], si = [];
   const edge = (list) => { const start = sp.length / 3; list.forEach(k => { const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]; sp.push(x, y, z, x, -120, z); });
@@ -599,20 +603,22 @@ function laharTimes(r, h) {
 const km = (m) => (m / 1000).toFixed(1) + " km";
 const fmtDur = (t) => { t = Math.round(t); if (t < 60) return t + " s"; const m = Math.floor(t / 60); if (m < 60) return m + " min"; return Math.floor(m / 60) + " h " + (m % 60) + " min"; };
 
-function runHazard(key) {
+function runHazard(key, valley) {
+  valley = valley || $("valley").value;
   const res = { key, cells: [], vals: [], timed: true, prox: null, route: null, level: null, text: "" };
   if (key === "aval" || key === "lahar") {
     const surf = key === "aval" ? "past" : "today", h = surf === "past" ? past : today, N = net(surf);
-    const p = key === "aval" ? { lon: -122.1968, lat: 46.2138 } : LAHARS[$("valley").value];
+    const p = key === "aval" ? { lon: -122.1968, lat: 46.2138 } : LAHARS[valley];
     const start = HM.snapToChannel(N, W, H, idxOf(p.lon, p.lat), 10, key === "aval" ? 3 : 10);
     if (start < 0) return null;
-    const V = key === "aval" ? 2.5e9 : LAHARS[$("valley").value].vol * 1e6, [a1, a2] = key === "aval" ? [0.2, 20] : [0.05, 200];
+    const V = key === "aval" ? 2.5e9 : LAHARS[valley].vol * 1e6, [a1, a2] = key === "aval" ? [0.2, 20] : [0.05, 200];
     const summit = surf === "past" ? [-122.1918, 46.1976] : [-122.1944, 46.1912], apex = HM.highestNear(h, W, H, idxOf(...summit), 25);
     const r = HM.laharz(h, N, W, H, CELL, start, a1 * Math.pow(V, 2 / 3), a2 * Math.pow(V, 2 / 3), () => {}, { maxHalfWidthCells: 67, proximal: { apex, k: 0.23 } });
     const cl = HM.cleanForDisplay(r.flooded, r.surface, h, W, H, 2);
     { const sm = HM.smoothMask(cl.mask, W, H, 2, 2); for (let q = 0; q < W * H; q++) if (!sm[q]) cl.mask[q] = 0; }   // round off thin fingers (drawing only)
     for (let q = 0; q < W * H; q++) if (cl.mask[q]) { res.cells.push(q); res.vals.push(isFinite(r.distOf[q]) ? r.distOf[q] : r.length); }
-    if (key === "lahar") { const T = laharTimes(r, h); res.vals = res.vals.map(T); } else res.timed = false;
+    res.path = r.path; res.pathDist = r.pathDist; res.valley = valley;
+    if (key === "lahar") { const T = laharTimes(r, h); res.T = T; res.vals = res.vals.map(T); } else res.timed = false;
     if (r.proximalExit > 0) {
       // danger zone mapped as Laharz_py does (ground below the H/L cone, cell by cell), only the slopes draining into this valley
       const z = HM.proximalZone(h, W, H, CELL, apex, 0.23, HM.catchment(N, W, H, r.path[r.proximalExit])), [ax, ay] = cellXY(apex), pd = [];
@@ -623,7 +629,7 @@ function runHazard(key) {
     res.level = key === "lahar" ? cl.surface : null;
     const left = r.reason === "edge" ? " It ran off the edge of the table." : "";
     res.text = key === "aval" ? `Travelled ${km(r.length)} (1980: 23 km).` :
-      `${LAHARS[$("valley").value].name}: travelled ${km(r.length)} down the valley.${left}`;
+      `${LAHARS[valley].name}: travelled ${km(r.length)} down the valley.${left}`;
   } else {
     const surf = key === "blast" ? "past" : "today", h = surf === "past" ? past : today;
     let vent = key === "blast" ? idxOf(-122.1918, 46.2120) : idxOf(-122.1890, 46.1990);
@@ -637,8 +643,7 @@ function runHazard(key) {
     const area = res.cells.length * CELL * CELL / 1e6;
     if (key === "blast") res.text = `Covered ${Math.round(area)} km² (1980: 600 km²).`;
     else { const pm = pfMapMask(); let both = 0; if (pm) for (const c of res.cells) if (pm.mask[c]) both++;
-      res.mapEdge = pm ? pm.edge : null;
-      res.text = `Reached ${km(north)} north (1980 map: 7.6 km). The model covers ${pm && pm.n ? Math.round(100 * both / pm.n) : 0}% of the mapped 1980 deposits (white outline).` +
+      res.text = `Reached ${km(north)} north (1980 map: 7.6 km). The model covers ${pm && pm.n ? Math.round(100 * both / pm.n) : 0}% of the mapped 1980 deposits.` +
         (pfCal.reached ? ` Its mobility (${pfCal.k.toFixed(3)}) was set to reach as far north as the map, so compare the shape.` : " On this ground it can't be matched to the map's distance, so this is the closest it gets."); }
     res.cone = { vent, Hh, k, sector, h };
   }
@@ -684,10 +689,11 @@ function paintAll(except) {
   for (const k of ["blast", "aval", "pf", "lahar"]) { const r = results[k]; if (!r || k === except || hidden.has(k)) continue;
     if (r.prox) r.prox.forEach(c => paintCell(c, COLORS[k], 90)); if (r.route) paintRoute(r.route, COLORS[k]);
     r.cells.forEach(c => paintCell(c, COLORS[k], 175));
-    if (r.mapEdge) r.mapEdge.forEach(c => paintCell(c, [255, 255, 255], 255)); }
+  }
 }
 function paintRoute(route, col) { for (const c of route) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const q = c + dj * W + di; if (q >= 0 && q < W * H) paintCell(q, col, 255); } }
 function toggleShow(k) {
+  if (day && day.entries.some(e => e.key === k)) { if (hidden.has(k)) hidden.delete(k); else hidden.add(k); syncShow(); panelDirty = true; return; }
   if (!results[k]) return;
   if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
   if (play && play.key === k) {                                     // end its playback at once, then repaint everything shown
@@ -698,7 +704,7 @@ function toggleShow(k) {
   if (coneMesh) coneMesh.visible = !hidden.has(coneMesh.userData.key);
   syncShow(); panelDirty = true;
 }
-function syncShow() { document.querySelectorAll("#show button").forEach(b => { const k = b.dataset.s, has = !!results[k];
+function syncShow() { document.querySelectorAll("#show button").forEach(b => { const k = b.dataset.s, has = !!results[k] || !!(day && day.entries.some(e => e.key === k));
   b.disabled = !has; b.setAttribute("aria-pressed", String(has && !hidden.has(k))); }); }
 function flushOverlay() { overlayCtx.putImageData(overlayImg, 0, 0); overlayTex.needsUpdate = true; }
 
@@ -736,7 +742,7 @@ function buildCone(res) {
 let play = null;
 const DURATION = 12;
 function startHazard(key) {
-  if (!today) return;
+  if (!today) return; endDay();
   info(`<b>${NAMES[key]}</b><br>Working it out…`);
   setTimeout(() => {                                                   // let the message show before the heavy work
     const res = runHazard(key);
@@ -745,12 +751,30 @@ function startHazard(key) {
     paintAll(key); flushOverlay(); buildCone(res); buildMud(res); buildFront(res);
     if (key === "aval" || key === "blast") setGround("past", false); else setGround("today", false);
     play = { key, res, t0: performance.now(), shown: 0 };
-    initSound(); if (key === "blast") boom(1.0); if (key === "aval") boom(0.6); if (key === "pf" && !colOn) setColumn(true);
+    initSound(); if (key === "blast") boom(1.0); if (key === "aval") boom(0.6);
     document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.h === key)));
   }, 30);
 }
 // Arrival texture for the playing hazard: R = when (0-1 of the playback), G = 0.5 danger zone, 1 the flow itself.
 // Squares just outside take their neighbour's time so the smooth edge doesn't creep outwards.
+function frontTexture(res) {
+  const PF = res.prox ? 0.2 : 0, arr = new Float32Array(W * H).fill(Infinity), g = new Float32Array(W * H);
+  if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = 0.5; });
+  const span = Math.max(1e-9, res.vmax - res.vmin);
+  res.cells.forEach((c, i) => { arr[c] = PF + (1 - PF) * (res.vals[i] - res.vmin) / span; g[c] = 1; });
+  const data = new Uint16Array(W * H * 2), toH = THREE.DataUtils.toHalfFloat;
+  for (let c = 0; c < W * H; c++) { let a = arr[c];
+    if (!isFinite(a)) { const i = c % W, j = (c / W) | 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj;
+      if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue; const v = arr[jj * W + ii]; if (v < a) a = v; } }
+    data[c * 2] = toH(isFinite(a) ? a : 2); data[c * 2 + 1] = toH(g[c]); }
+  const t = new THREE.DataTexture(data, W, H, THREE.RGFormat, THREE.HalfFloatType); t.magFilter = t.minFilter = THREE.LinearFilter; t.flipY = false; t.needsUpdate = true;
+  return t;
+}
+function makeFrontLayer(res) {
+  const u = { uFront: { value: frontTexture(res) }, uT: { value: 0 }, uCol: { value: new THREE.Color().setRGB(...COLORS[res.key].map(v => v / 255), THREE.SRGBColorSpace) } };
+  const m = new THREE.Mesh(ovGeo, front.material.clone()); m.material.uniforms = u; m.renderOrder = 2; m.visible = false; model.add(m);
+  return { mesh: m, u };
+}
 function buildFront(res) {
   const PF = res.prox ? 0.2 : 0, arr = new Float32Array(W * H).fill(Infinity), g = new Float32Array(W * H);
   if (res.prox) res.prox.forEach((c, i) => { arr[c] = PF * res.proxD[i] / Math.max(1, res.proxMax); g[c] = 0.5; });
@@ -783,7 +807,7 @@ function stepPlay(now) {
   const clock = res.timed ? `Time since it started: <span id="clock">${fmtDur(vcut)}</span>` : "No reliable speed found for the avalanche, so it plays in order.";
   if (now - (play.lastInfo || 0) > 200 || f === 1) { info(`<b>${NAMES[key]}</b><br>${clock}${f === 1 ? "<br>" + res.text : ""}`); play.lastInfo = now; }
   if (f === 1) { if (key === "aval") ground = "today", updateGroundButton(); play = null; paintAll(); flushOverlay(); front.visible = false;
-    if (key === "blast" && !colOn) { setColumn(true); info(`<b>${NAMES[key]}</b><br>${res.text}<br>Less than an hour later, a column of ash rose more than 24 km high.`); } }
+  }
 }
 function setGround(which, animate) {
   ground = which; updateGroundButton();
@@ -835,26 +859,27 @@ function emit(p, x, y, z, vx, vy, vz, life, s0, s1, a0, col, heat) {
 }
 const CLOUD = { aval: [0.46, 0.37, 0.27], blast: [0.20, 0.19, 0.19], pf: [0.55, 0.54, 0.52] };
 // clouds rising from the moving front of the playing hazard
-function frontCell() {
-  if (!play) return -1; const res = play.res;
-  if (play.pr && play.pr.hi > play.pr.lo) return res.prox[play.pr.lo + Math.floor(Math.random() * (play.pr.hi - play.pr.lo))];
-  if (play.fr && play.fr.hi > play.fr.lo) return res.cells[play.fr.lo + Math.floor(Math.random() * (play.fr.hi - play.fr.lo))];
+function activeFronts() { return day ? dayFronts() : play && !hidden.has(play.key) ? [play] : []; }
+function frontCell(e) {
+  if (!e) return -1; const res = e.res;
+  if (e.pr && e.pr.hi > e.pr.lo) return res.prox[e.pr.lo + Math.floor(Math.random() * (e.pr.hi - e.pr.lo))];
+  if (e.fr && e.fr.hi > e.fr.lo) return res.cells[e.fr.lo + Math.floor(Math.random() * (e.fr.hi - e.fr.lo))];
   return -1;
 }
 function stepEffects(dt) {
   if (!cloudP) return;
   // 1. clouds from the front
-  if (play && CLOUD[play.key] && !hidden.has(play.key)) {
-    const key = play.key, rate = key === "blast" ? 420 : key === "aval" ? 220 : 200, [vx0, vy0] = craterXYZ;
-    cloudP.acc += rate * dt;
-    while (cloudP.acc >= 1) { cloudP.acc--; const c = frontCell(); if (c < 0) break; const [x, y] = cellXY(c), g = groundAt(x, y);
+  for (const fe of activeFronts()) { if (!CLOUD[fe.key]) continue;
+    const key = fe.key, rate = key === "blast" ? 420 : key === "aval" ? 220 : 200, [vx0, vy0] = craterXYZ;
+    fe.acc = (cloudP.accs = cloudP.accs || {})[key] = ((cloudP.accs[key] || 0) + rate * dt);
+    while (cloudP.accs[key] >= 1) { cloudP.accs[key]--; const c = frontCell(fe); if (c < 0) break; const [x, y] = cellXY(c), g = groundAt(x, y);
       const dx = x - vx0, dy = y - vy0, d = Math.max(1, Math.hypot(dx, dy)), out = key === "blast" ? rnd(200, 500) : rnd(40, 160);
       emit(cloudP, x + rnd(-80, 80), y + rnd(-80, 80), g + rnd(20, key === "blast" ? 400 : 150), dx / d * out, dy / d * out,
         key === "blast" ? rnd(150, 420) : key === "pf" ? rnd(200, 500) : rnd(60, 200), key === "blast" ? rnd(2.5, 3.5) : rnd(2, 3.2),
         key === "aval" ? 300 : 600, key === "blast" ? 3000 : key === "pf" ? 2200 : 1300, key === "aval" ? 0.55 : 0.7, CLOUD[key], key === "aval" ? 0 : rnd(0.0, 0.12)); }
   }
   // 2. the eruption column
-  if (colOn) { colP.acc += 260 * dt;
+  if (colOn) { colP.acc += 260 * colRate * dt;
     while (colP.acc >= 1) { colP.acc--; const a = rnd(0, Math.PI * 2), r = rnd(0, 300);
       const k = emit(colP, craterXYZ[0] + Math.cos(a) * r, craterXYZ[1] + Math.sin(a) * r, craterXYZ[2] + 50, rnd(-80, 80), rnd(-80, 80), 24000 / rnd(2.2, 3.2), rnd(9, 12), 1200, 5000, 0.55, [0.40, 0.39, 0.37], 0.05);
       colP.top[k] = 24000 * rnd(0.85, 1.05); } }
@@ -880,8 +905,7 @@ function stepEffects(dt) {
     p.pa.needsUpdate = p.da.needsUpdate = p.ca.needsUpdate = true;
   }
 }
-function setColumn(v) { colOn = v; $("colBtn").setAttribute("aria-pressed", String(v)); panelDirty = true;
-  if (v && !play) info("<b>Eruption column</b><br>Less than an hour after the collapse, a column of ash rose more than 24 km in under 15 minutes. It went on for 9 hours, strongest between 3 and 5 p.m. The wind blew the ash east: Spokane, 400 km away, went completely dark."); }
+function setColumn(v) { colOn = v; colRate = 1; panelDirty = true; }
 
 // Sound, made in the browser (no audio files), placed in the room
 const snd = { ctx: null, on: true };
@@ -913,22 +937,92 @@ function stepSound() {
   if (L.positionX) { L.positionX.value = _v.x; L.positionY.value = _v.y; L.positionZ.value = _v.z; L.forwardX.value = _f.x; L.forwardY.value = _f.y; L.forwardZ.value = _f.z; L.upX.value = _u.x; L.upY.value = _u.y; L.upZ.value = _u.z; }
   snd.volcanoPan.refDistance = snd.frontPan.refDistance = 0.4 * table.scale.x;
   panTo(snd.volcanoPan, craterXYZ[0], craterXYZ[1], craterXYZ[2]);
-  const c = frontCell(); if (c >= 0) { const [x, y] = cellXY(c); panTo(snd.frontPan, x, y, groundAt(x, y)); }
-  const t = ctx.currentTime, k = play ? play.key : null, playing = k && CLOUD[k] && !hidden.has(k);
-  snd.rumble.gain.setTargetAtTime(colOn ? 0.55 : playing ? 0.35 : 0, t, 0.3);
-  snd.roar.gain.setTargetAtTime(colOn ? 0.4 : 0, t, 0.5);
+  const fr = activeFronts().filter(e => CLOUD[e.key]).sort((a, b) => ({ blast: 0, aval: 1, pf: 2 })[a.key] - ({ blast: 0, aval: 1, pf: 2 })[b.key])[0];
+  const c = frontCell(fr); if (c >= 0) { const [x, y] = cellXY(c); panTo(snd.frontPan, x, y, groundAt(x, y)); }
+  const t = ctx.currentTime, k = fr ? fr.key : null, playing = !!k;
+  snd.rumble.gain.setTargetAtTime(colOn ? 0.3 + 0.35 * colRate : playing ? 0.35 : 0, t, 0.3);
+  snd.roar.gain.setTargetAtTime(colOn ? 0.45 * colRate : 0, t, 0.5);
   snd.rush.gain.setTargetAtTime(playing ? (k === "blast" ? 1.0 : 0.7) : 0, t, 0.25);
 }
 function setSound(v) { snd.on = v; $("soundBtn").setAttribute("aria-pressed", String(v)); if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); panelDirty = true; }
+
+// ---------------- Play 18 May: every hazard on one clock ----------------
+// Times (USGS): 8:32 collapse, avalanche and blast; lahars down the flanks "within minutes"; Plinian column from less than an hour
+// after the collapse, over 24 km within 15 minutes, for 9 hours, strongest 3-5 p.m.; pyroclastic flows from just after noon;
+// the North Fork lahar formed on the avalanche deposit and its peak "did not leave the distal end of the avalanche deposit
+// until about 1330" (USGS Professional Paper 1250).
+const DSEG = [[8.5, 8.8, 14], [8.8, 12.0, 10], [12.0, 15.0, 12], [15.0, 17.5, 10], [17.5, 18.6, 6]];
+const DAY_S = DSEG.reduce((a, g) => a + g[2], 0);
+const dayHours = (sec) => { let s = sec; for (const [a, b, d] of DSEG) { if (s <= d) return a + (b - a) * s / d; s -= d; } return DSEG[DSEG.length - 1][1]; };
+const COL_START = 9.0, COL_FULL = 9.25, COL_PEAK = [15, 17], COL_END = 18.0;
+const colIntensity = (h) => h < COL_START ? 0 : h < COL_FULL ? (h - COL_START) / (COL_FULL - COL_START) * 0.6 : h < COL_PEAK[0] ? 0.6 : h < COL_PEAK[1] ? 1 : h < COL_END ? 1 - 0.8 * (h - COL_PEAK[1]) / (COL_END - COL_PEAK[1]) : Math.max(0, 0.2 - (h - COL_END) * 0.8);
+const fmtClock = (h) => { const hh = Math.floor(h), mm = Math.floor((h - hh) * 60); return `${hh > 12 ? hh - 12 : hh}:${String(mm).padStart(2, "0")} ${hh >= 12 ? "p.m." : "a.m."}`; };
+let day = null, colRate = 1;
+function dayText(h) {
+  if (h < 8.533) return "Sunday 18 May 1980. The north side of the volcano has been bulging for weeks.";
+  if (h < 8.9) return "8:32 a.m. An earthquake shook loose the bulging north side. The avalanche rushed down the North Fork Toutle, and a sideways blast swept across the land to the north. Within minutes, lahars poured down the volcano's other sides.";
+  if (h < 12.08) return "Less than an hour after the collapse, a column of ash rose more than 24 km within 15 minutes. The wind blew the ash east.";
+  if (h < 13.5) return "Just after noon, pyroclastic flows began pouring out of the crater at 80–130 km/h. They went on through the afternoon.";
+  if (h < 15) return "About 1:30 p.m. the biggest lahar, formed from water escaping the avalanche deposit, left the end of the deposit and swept down the North Fork Toutle.";
+  if (h < 17) return "Between 3 and 5 p.m. the eruption was at its strongest.";
+  if (h < 18.3) return "The column went on until the evening, about 9 hours in all. Spokane, 400 km east, was in complete darkness.";
+  return "The end of the day. Lahars destroyed more than 200 homes. Tap Play 18 May to watch it again.";
+}
+async function prepareDay() {
+  clearAll(); initSound();
+  const list = [["aval"], ["blast"], ["lahar", "sf"], ["lahar", "pine"], ["lahar", "muddy"], ["pf"], ["lahar", "nf"]], out = [];
+  for (let i = 0; i < list.length; i++) { info(`<b>Play 18 May</b><br>Working out the day… ${Math.round(100 * i / list.length)}%`); await new Promise(r => setTimeout(r, 30));
+    const [key, v] = list[i], res = runHazard(key, v); if (res) out.push(res); }
+  const at = { aval: 8.5333, blast: 8.5333, pf: 12.083 }, entries = [];
+  const aval = out.find(r => r.key === "aval"), avalEnd = aval && aval.path ? cellXY(aval.path[aval.path.length - 1]) : null;
+  for (const res of out) {
+    let start = at[res.key], dur = res.vmax / 3600;
+    if (res.key === "aval") dur = 10 / 60;                                      // the avalanche plays in order over about 10 minutes (no reliable speed)
+    if (res.key === "pf") dur = 2.5;                                             // repeated flows built up the deposits through the afternoon
+    if (res.key === "lahar" && res.valley !== "nf") start = 8.5833;              // down the flanks within minutes of 8:32
+    if (res.key === "lahar" && res.valley === "nf") {                            // time it so the front leaves the avalanche deposit at about 1:30 p.m.
+      let t = 0; if (avalEnd && res.path) { let best = Infinity, bi = 0; res.path.forEach((c, i) => { const [x, y] = cellXY(c), d = Math.hypot(x - avalEnd[0], y - avalEnd[1]); if (d < best) { best = d; bi = i; } });
+        t = res.T(res.pathDist[bi]) / 3600; }
+      start = Math.max(12.5, 13.5 - t); }
+    const L = makeFrontLayer(res); entries.push({ key: res.key, res, start, dur: Math.max(dur, 0.1), ...L });   // at least 6 minutes, so short flows are still seen
+  }
+  day = { sec: 0, playing: true, entries, last: performance.now(), boomed: false };
+  setGround("past", false); syncShow(); panelDirty = true; syncDayButton();
+}
+function endDay() {
+  if (!day) return; for (const e of day.entries) { model.remove(e.mesh); e.mesh.material.dispose(); e.u.uFront.value.dispose(); }
+  day = null; colOn = false; syncShow(); syncDayButton();
+}
+function dayFronts() {
+  const out = []; if (!day) return out; const h = dayHours(day.sec);
+  for (const e of day.entries) { const f = (h - e.start) / e.dur; if (f <= 0 || f >= 1 || hidden.has(e.key)) continue;
+    const res = e.res, PF = res.prox ? 0.2 : 0;
+    if (PF && f < PF) { const dcut = res.proxMax * f / PF; let m = 0; while (m < res.prox.length && res.proxD[m] <= dcut) m++; out.push({ key: e.key, res, pr: { lo: Math.max(0, m - 60), hi: m } }); continue; }
+    const fm = PF ? (f - PF) / (1 - PF) : f, vcut = res.vmin + (res.vmax - res.vmin) * fm; let lo = 0, hi = res.vals.length; while (lo < hi) { const m = (lo + hi) >> 1; if (res.vals[m] <= vcut) lo = m + 1; else hi = m; }
+    out.push({ key: e.key, res, fr: { lo: Math.max(0, lo - Math.max(40, Math.round(res.cells.length * 0.03))), hi: lo } }); }
+  return out;
+}
+function stepDay(now) {
+  if (!day) return; const dt = Math.min(0.05, (now - day.last) / 1000); day.last = now;
+  if (day.playing) { day.sec = Math.min(DAY_S, day.sec + dt); if (day.sec >= DAY_S) { day.playing = false; syncDayButton(); } }
+  const h = dayHours(day.sec);
+  for (const e of day.entries) { const f = Math.min(1, Math.max(0, (h - e.start) / e.dur)); e.u.uT.value = f; e.mesh.visible = h >= e.start && !hidden.has(e.key);
+    if (e.key === "aval") applyMorph(f); }
+  const ci = colIntensity(h); colOn = ci > 0.01; colRate = ci;
+  if (!day.boomed && h >= 8.5333) { day.boomed = true; boom(1.0); }
+  if (now - (day.lastInfo || 0) > 250) { info(`<b>18 May 1980, ${fmtClock(h)}</b><br>${dayText(h)}`); day.lastInfo = now; }
+}
+function syncDayButton() { const t = !day ? "▶ Play 18 May" : day.playing ? "❚❚ Pause" : day.sec >= DAY_S ? "▶ Play again" : "▶ Play"; $("dayBtn").textContent = t; panelDirty = true; }
+function dayButton() { initSound(); if (!day || day.sec >= DAY_S) prepareDay(); else { day.playing = !day.playing; day.last = performance.now(); syncDayButton(); } }
 
 // ---------------- HTML controls ----------------
 document.querySelectorAll("#ui .grid button[data-h]").forEach(b => b.onclick = () => startHazard(b.dataset.h));
 $("ground").onclick = () => { if (!past) return; setGround(ground === "past" ? "today" : "past", true); };
 $("clear").onclick = () => clearAll();
-$("colBtn").onclick = () => { initSound(); setColumn(!colOn); };
+$("dayBtn").onclick = () => dayButton();
 $("soundBtn").onclick = () => setSound(!snd.on);
 document.querySelectorAll("#show button").forEach(b => b.onclick = () => toggleShow(b.dataset.s));
-function clearAll() { setColumn(false); for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; if (front) front.visible = false; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
+function clearAll() { endDay(); setColumn(false); for (const k in results) delete results[k]; hidden.clear(); syncShow(); panelDirty = true; play = null; if (front) front.visible = false; overlayImg.data.fill(0); flushOverlay(); buildMud({}); buildCone({}); info("Cleared. Pick a hazard."); }
 
 // ---------------- WebXR ----------------
 const xrBox = $("xr");
@@ -968,7 +1062,7 @@ addBtn("pf", "3 Pyroclastic flows", 40, 280, 460, 110, "#dc2626"); addBtn("lahar
 addBtn("valley", "", 40, 410, 944, 90); addBtn("ground", "", 40, 520, 944, 90);
 addBtn("smaller", "Smaller", 40, 630, 300, 90); addBtn("bigger", "Bigger", 362, 630, 300, 90); addBtn("rotate", "Turn", 684, 630, 300, 90);
 addBtn("clear", "Clear", 40, 740, 460, 90); addBtn("reset", "Reset table", 524, 740, 460, 90);
-addBtn("column", "Eruption column", 40, 1000, 580, 90); addBtn("sound", "Sound", 644, 1000, 340, 90);
+addBtn("day", "", 40, 1000, 580, 90); addBtn("sound", "Sound", 644, 1000, 340, 90);
 // show / hide each hazard once it has been run
 [["aval", "Avalanche", "#8a5a2b"], ["blast", "Blast", "#6d28d9"], ["pf", "Pyro. flows", "#dc2626"], ["lahar", "Lahar", "#0e7490"]]
   .forEach(([k, name, col], n) => addBtn("show:" + k, name, 40 + n * 238, 890, 224, 90, col));
@@ -979,7 +1073,7 @@ function drawPanel() {
   pctx.fillStyle = "#6b665c"; pctx.font = "600 32px system-ui, sans-serif"; pctx.fillText("Show on the map", 40, 872);
   for (let b = 0; b < BTN.length; b++) {
     const B = BTN[b]; let label = B.label;
-    if (B.id.startsWith("show:")) { const k = B.id.slice(5), has = !!results[k], on = has && !hidden.has(k);
+    if (B.id.startsWith("show:")) { const k = B.id.slice(5), has = !!results[k] || !!(day && day.entries.some(e => e.key === k)), on = has && !hidden.has(k);
       pctx.globalAlpha = has ? 1 : 0.4; pctx.fillStyle = b === hover && has ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
       const bx = B.x + 20, by = B.y + B.h / 2 - 16; pctx.lineWidth = 4; pctx.strokeStyle = "#22201c"; pctx.strokeRect(bx, by, 32, 32);
       if (on) { pctx.fillStyle = B.color; pctx.fillRect(bx + 4, by + 4, 24, 24); }
@@ -989,7 +1083,8 @@ function drawPanel() {
     pctx.fillStyle = b === hover ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
     if (play && play.key === B.id) { pctx.strokeStyle = "#b4381c"; pctx.lineWidth = 8; roundRect(B.x, B.y, B.w, B.h, 20); pctx.stroke(); }
     let tx = B.x + 28; if (B.color) { pctx.fillStyle = B.color; pctx.fillRect(B.x + 26, B.y + B.h / 2 - 14, 28, 28); tx += 44; }
-    pctx.globalAlpha = (B.id === "column" && !colOn) || (B.id === "sound" && !snd.on) ? 0.45 : 1;
+    if (B.id === "day") label = $("dayBtn").textContent.replace(/^[▶❚ ]+/, "");
+    pctx.globalAlpha = B.id === "sound" && !snd.on ? 0.45 : 1;
     pctx.fillStyle = "#22201c"; pctx.font = "600 44px system-ui, sans-serif"; pctx.fillText(label, tx, B.y + B.h / 2 + 15); pctx.globalAlpha = 1;
   }
   pctx.fillStyle = "#22201c"; pctx.font = "40px system-ui, sans-serif";
@@ -1011,7 +1106,7 @@ function placeAround() {
   const sh = Math.max(0.05, ty - 0.02); stand.scale.set(1, sh / 0.72, 1); stand.position.set(table.position.x, sh / 2, table.position.z); stand.rotation.y = yaw;
   stand.visible = floor.visible && ty > 0.3;
   // menu to the left of the table (the table is 1 m wide), raised above the tallest terrain so they never overlap
-  panel.position.set(head.x + fwd.x * 0.6 - side.x * 0.8, head.y - 0.25, head.z + fwd.z * 0.6 - side.z * 0.8); panel.lookAt(head.x, head.y - 0.1, head.z);
+  panel.position.set(head.x + fwd.x * 0.6 - side.x * 0.92, head.y - 0.25, head.z + fwd.z * 0.6 - side.z * 0.92); panel.lookAt(head.x, head.y - 0.1, head.z);
   panelDirty = true; needPlace = false;
 }
 function pressButton(id) {
@@ -1022,7 +1117,7 @@ function pressButton(id) {
   else if (id === "bigger") table.scale.multiplyScalar(1.25);
   else if (id === "rotate") table.rotateY(Math.PI / 4);
   else if (id === "clear") clearAll();
-  else if (id === "column") { initSound(); setColumn(!colOn); }
+  else if (id === "day") dayButton();
   else if (id === "sound") setSound(!snd.on);
   else if (id.startsWith("show:")) toggleShow(id.slice(5));
   else if (id === "reset") { for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; } placeAround(); }
@@ -1057,7 +1152,7 @@ function hitButton(c) {
 renderer.setAnimationLoop((t) => {
   const now = performance.now();
   const dtFx = Math.min(0.05, (now - (window.__lastFx || now)) / 1000); window.__lastFx = now;
-  stepPlay(now); stepGround(now); stepEffects(dtFx); stepSound();
+  stepPlay(now); stepDay(now); stepGround(now); stepEffects(dtFx); stepSound();
   if (renderer.xr.isPresenting) {
     if (needPlace) placeAround();
     let hv = -1; for (const c of ctrls) { const b = hitButton(c); if (b >= 0) hv = b; }
@@ -1073,7 +1168,7 @@ renderer.setAnimationLoop((t) => {
     info("Loading the mountain… 0%");
     const [el, img] = await Promise.all([
       loadElevation(f => info(`Loading the mountain… ${Math.round(f * 100)}%`)),
-      loadImagery(() => {})
+      loadImagery(() => {}, Math.min(renderer.capabilities.maxTextureSize, 8192))
     ]);
     today = el.h;
     let lo = Infinity; for (const v of today) if (isFinite(v) && v < lo) lo = v; HBASE = lo - 50;
@@ -1091,7 +1186,7 @@ renderer.setAnimationLoop((t) => {
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
-window.__msh = { fx(sec) { for (let t = 0; t < sec; t += 1 / 60) stepEffects(1 / 60); }, get cloudP() { return cloudP; }, get colP() { return colP; }, get colOn() { return colOn; }, snd, setColumn, hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
+window.__msh = { get day() { return day; }, dayButton, dayHours, DAY_S, fx(sec) { for (let t = 0; t < sec; t += 1 / 60) stepEffects(1 / 60); }, get cloudP() { return cloudP; }, get colP() { return colP; }, get colOn() { return colOn; }, snd, setColumn, hidden, renderer, ctrls, hitButton, runHazard, results, get play() { return play; }, W, H, panel, BTN, table, scene,
   btnWorld(id) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
     const v = new THREE.Vector3(((B.x + B.w / 2) / PW - 0.5) * 0.34, (0.5 - (B.y + B.h / 2) / PH) * 0.34 * PH / PW, 0); return panel.localToWorld(v).toArray(); },
   aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
