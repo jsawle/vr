@@ -53,6 +53,7 @@
 <body>
 <canvas id="three"></canvas>
 <div id="ui">
+  <div style="background:var(--chip);border-left:4px solid var(--accent);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px"><b>New:</b> <a href="vesuvius-1944-vr-story.html" style="color:var(--accent);font-weight:600">a step-by-step version</a> that pauses at each moment of the eruption.</div>
   <h1>Vesuvius, March 1944</h1>
   <div class="sub">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
   <div class="row"><button id="play" class="primary" disabled>▶ Play</button><button id="restart" disabled>Restart</button></div>
@@ -80,7 +81,7 @@
     <summary>Versions</summary>
     <table class="vers">
       <tr><th>Part</th><th>Version</th><th>What it is</th></tr>
-      <tr><td>App</td><td>VR 0.4</td><td>0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.5</td><td>0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
@@ -296,7 +297,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.4";
+const VERSION = "VR 0.5";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const LM = window.LavaModel;
