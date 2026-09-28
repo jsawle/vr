@@ -25,7 +25,9 @@
   .row > * { flex: 1; }
   button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); }
   button.primary { background: var(--accent); color: #fff; border-color: transparent; }
-  button[aria-pressed="false"] { opacity: .55; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #1a0f0a; } }
+  button[aria-pressed="false"] { opacity: .8; }
+  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
   button:disabled { opacity: .45; cursor: default; }
   input[type=range] { width: 100%; accent-color: var(--accent); margin: 10px 0 0; }
   #date { font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 8px; }
@@ -38,7 +40,7 @@
   #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
     background: var(--accent) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
   #xr button[disabled], #xr a { display: none; }
-  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #ui .sub, details { display: none; } #credits { max-width: 90%; } }
+  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #ui .sub, details:not(.keep) { display: none; } #credits { max-width: 90%; } }
   #ui .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #ui .btns button { flex: 1 1 auto; font-size: 12.5px; padding: 6px 8px; }
   #ui .hint { font-size: 12px; color: var(--muted); }
@@ -85,17 +87,22 @@
   <details>
     <summary>How this works</summary>
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
-    <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colours show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
-    <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate over 10 km at the peak. The wind carried ash 15–20 km east. Smaller explosions blew ash to the south-west until 29 March. The particles, fountain height and the shape of the grey ash on the ground are illustrations that follow those directions and distances.</p>
-    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Time runs at 3 minutes a second while the lava moves, so the front's speed is sped up. The falling ash is an illustration.</p>
+    <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colors show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
+    <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate about 10 km at its peak. The wind carried ash 15–20 km east. Smaller explosions, under 2 km high, blew ash to the south-west until 29 March. The particles, fountain height and the shape of the gray ash on the ground are illustrations that follow those directions and distances.</p>
+    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, which is an estimate. Time runs at the same pace as the rest of the story, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano</a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction</a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)</a></p>
   </details>
-  <details>
+  <details class="keep">
     <summary>Versions</summary>
     <table class="vers">
       <tr><th>Part</th><th>Version</th><th>What it is</th></tr>
-      <tr><td>App</td><td>VR story 0.1</td><td>Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>App</td><td>VR story 0.2</td><td>0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>Lava model</td><td>1.0</td><td>DOWNFLOW-style steepest descent with hollow filling (same code as the lava explorer), run for the two 1944 flows; lava drawn where at least 1 in 5 flows went</td></tr>
+      <tr><td>Lava look and timing</td><td>0.1</td><td>Cools from yellow-hot to a dark crust; one speed, timed so the northern flow reaches San Sebastiano early on 21 March. First numbered version</td></tr>
+      <tr><td>Ash cloud and fountains</td><td>0.2</td><td>Illustration: eight fountains up to about 4 km, an ash column over 5 km blown east, then bursts under 2 km blown south-west. 0.2: those bursts lowered from 3 km (INGV)</td></tr>
+      <tr><td>Ash on the ground</td><td>0.1</td><td>Illustration of the ash-fall areas east and south-west. First numbered version</td></tr>
+      <tr><td>Sound</td><td>0.1</td><td>Made in the browser, no recordings. Off until you turn it on</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the 3D story. The eight moments come from this file too</td></tr>
     </table>
   </details>
@@ -311,7 +318,8 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR story 0.1";
+const VERSION = "VR story 0.2";
+const VERSIONS = { app: VERSION, lava: "1.0", lavaLook: "0.1", cloud: "0.2", ground: "0.1", sound: "0.1", archive: window.VesuviusArchive ? VesuviusArchive.version : "missing" };
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.replace("VR ", "")}</div>`);
 const LM = window.LavaModel;
@@ -463,7 +471,7 @@ const hAt = (x, y) => { const i = Math.floor((x - XMIN) / CELL), j = Math.floor(
 
 // Lava and ash are drawn by one shader on a copy of the ground: lava appears where the playback time has passed its
 // arrival time (so the front moves smoothly between grid squares) and cools from yellow-hot to dark crust.
-const LAVA_THICK = 5;   // m: illustrative; about 10 million m³ of lava (eruption catalogue) spread over the model's flows
+const LAVA_THICK = 5;   // m: illustrative estimate
 const U = { uThick: { value: LAVA_THICK }, uLava: { value: null }, uAsh: { value: null }, uT: { value: 0 }, uAshE: { value: 0 }, uAshW: { value: 0 },
   uAshOn: { value: 1 }, uClock: { value: 0 }, uGrid: { value: new THREE.Vector2(W, H) }, uLight: { value: new THREE.Vector3(-0.5, 0.8, 0.35).normalize() } };
 const overlayMat = new THREE.ShaderMaterial({
@@ -678,7 +686,7 @@ const WALK_RATE_LAVA = 0.05, WALK_RATE_LATER = 1.0;          // hours of 1944 pe
 const PATCH = 3200, PSTEP = 10, PATCH_Z = 16;
 const SPOTS = {
   ss: { name: "San Sebastiano", town: TOWNS[0], note: "You are standing on the edge of San Sebastiano, beside where the model's northern lava flow arrives. The volcano is in front of you." },
-  po: { name: "Pompei", town: TOWNS[7], note: "You are standing in Pompei, about 9 km south-east of the crater, under the path of the ash cloud." }
+  po: { name: "Pompei", town: TOWNS[7], note: "You are standing in Pompei, about 10 km south-east of the crater, under the path of the ash cloud." }
 };
 let walk = null, patch = null, isAR = false, localP = null, imgInfo = null;
 const hBil = (x, y) => { const fx = (x - XMIN) / CELL - 0.5, fy = (YMAX - y) / CELL - 0.5, i = Math.max(0, Math.min(W - 2, Math.floor(fx))), j = Math.max(0, Math.min(H - 2, Math.floor(fy)));
@@ -870,7 +878,7 @@ function stateAt(h) {
   else if (h < T.phase4) { s.phase = 3; const f = (h - T.column) / (T.phase4 - T.column);
     s.ashRate = 380; s.top = 6000; s.windB = ASH_AXIS_E; s.windV = 2200; s.heat = 0.15; s.rumble = 0.8; s.roar = 0.45; s.booms = 0.8; s.glow = 0.3; s.ashE = f; }
   else if (h < T.end) { s.phase = 4; const f = (h - T.phase4) / (T.end - T.phase4), burst = Math.pow(Math.max(0, Math.sin(f * 14 * Math.PI)), 3) * (1 - f * 0.6);
-    s.ashRate = 220 * burst; s.top = 3000; s.windB = ASH_AXIS_W; s.windV = 1500; s.rumble = 0.2 + 0.4 * burst; s.roar = 0.2 * burst; s.booms = 0.5 * burst; s.glow = 0.1; s.ashE = 1; s.ashW = f; }
+    s.ashRate = 220 * burst; s.top = 1800; s.windB = ASH_AXIS_W; s.windV = 1500; s.rumble = 0.2 + 0.4 * burst; s.roar = 0.2 * burst; s.booms = 0.5 * burst; s.glow = 0.1; s.ashE = 1; s.ashW = f; }
   else { s.phase = 5; s.ashE = 1; s.ashW = 1; s.rumble = 0; }
   // the lava front (for the crackling sound)
   if (lava.cells.length) { const a = lava.arr; let lo = 0, hi = lava.cells.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[lava.cells[m]] < h) lo = m + 1; else hi = m; }
@@ -882,7 +890,7 @@ const PHASE_TEXT = {
   0: "Press Play to watch the eruption of March 1944.",
   1: "<b>Lava flows.</b> Two flows left the crater. One went south-east. The other went north, was turned west by Monte Somma and moved at 50–300 m an hour towards San Sebastiano and Massa di Somma.",
   2: "<b>Lava fountains.</b> Eight fountains of lava, one after another. Material was thrown up to about 4 km.",
-  3: "<b>Explosions.</b> An eruption column more than 5 km high (studies estimate over 10 km at its peak). The wind carried ash 15–20 km east over Terzigno, Pompei, Scafati, Angri, Nocera, Poggiomarino and Cava. Falling ash damaged dozens of American B-25 bombers at a nearby airfield.",
+  3: "<b>Explosions.</b> An eruption column more than 5 km high (studies estimate about 10 km at its peak). The wind carried ash 15–20 km east over Terzigno, Pompei, Scafati, Angri, Nocera, Poggiomarino and Cava. Falling ash damaged dozens of American B-25 bombers at a nearby airfield.",
   4: "<b>Smaller explosions.</b> Ash plumes blew to the south-west, until the eruption ended on 29 March.",
   5: "<b>The end of the eruption.</b> Vesuvius has not erupted since. It is dormant, not extinct."
 };
@@ -897,14 +905,14 @@ function stepPlayback(now) {
   if (pb.playing) {                                          // play to the end of this moment, then wait for Next
     pb.sec = Math.min(story.endSec, pb.sec + dt);
     if (pb.sec >= story.endSec) { setPlaying(false); momentDone(); } }
-  const h = hoursAt(pb.sec), st = stateAt(h);
+  const h = story.m && story.m.h1 <= 0 ? 0 : hoursAt(pb.sec), st = stateAt(h);   // the first moment is before the eruption
   if (walk) stepWalk(dt, st);
   U.uT.value = h / TOTAL_H; U.uClock.value = now / 1000; U.uAshE.value = st.ashE; U.uAshW.value = st.ashW;
   stepParticles(dt, st);                                     // the eruption keeps moving while a moment waits
   const sc = table.scale.x; glow.distance = 0.35 * sc;
   glow.intensity = 0.12 * st.glow * (0.8 + 0.2 * Math.sin(now / 90) * Math.sin(now / 37)) * Math.pow(sc, 1.5);
   stepSound(st, pb.playing && snd.on);
-  const date = fmtDate(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; panelDirty = true; }
+  const date = h <= 0 ? "March 1944" : h >= T.end ? "After 29 March 1944" : fmtDate(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; panelDirty = true; }
   if (st.phase !== pb.phase) pb.phase = st.phase;
 }
 let scrubbing = false;
@@ -912,6 +920,7 @@ $("scrub").oninput = () => { scrubbing = true; pb.sec = $("scrub").value / 1000 
 $("scrub").onchange = () => { scrubbing = false; };
 $("play").onclick = () => {
   if (!story.m || !story.m.dur) return;
+  clearTimeout(showMoment.t);                                // a click beats the automatic start
   if (pb.playing) setPlaying(false);
   else { if (pb.sec >= story.endSec) { pb.sec = secAt(story.m.h0); clearAll(); } setPlaying(true); }
 };
@@ -948,7 +957,7 @@ $("restart").onclick = () => restart();
 const toggles = { sound: false, ash: true, names: true };
 function setToggle(k, v) { toggles[k] = v; const btn = { sound: "sound", ash: "ashBtn", names: "names" }[k]; $(btn).setAttribute("aria-pressed", String(v));
   if (k === "sound") { snd.on = v; if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); }
-  if (k === "ash") { U.uAshOn.value = v ? 1 : 0; ashP.mesh.visible = v; }
+  if (k === "ash") { U.uAshOn.value = v ? 1 : 0; if (ashP) ashP.mesh.visible = v; }
   if (k === "names") labels.visible = v && !walk;
   panelDirty = true; }
 $("sound").onclick = () => setToggle("sound", !toggles.sound);
@@ -1132,7 +1141,7 @@ renderer.setAnimationLoop(() => {
     for (const id of ["standSS", "standPO"]) $(id).disabled = false;
     panelDate = fmtDate(T.start); $("date").textContent = panelDate; pb.sec = 0; pb.phase = 0; info("");
     if (MOMENTS.length) showMoment(0); else info("The story couldn't load. Check your connection and reload.");
-    console.info("Vesuvius VR", VERSION, { grid: [W, H], elevation: el.source, imageryZoom: img.zoom, lavaCells: lava.cells.length, speed_m_per_h: Math.round(lava.speed), townReached: lava.townReached });
+    console.info("Vesuvius VR", VERSIONS, { grid: [W, H], elevation: el.source, imageryZoom: img.zoom, lavaCells: lava.cells.length, speed_m_per_h: Math.round(lava.speed), townReached: lava.townReached });
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
