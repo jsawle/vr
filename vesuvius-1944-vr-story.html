@@ -51,9 +51,9 @@
   #ui .mquote small { display: block; font: 11.5px system-ui, sans-serif; color: var(--muted); margin-top: 3px; }
   #ui .mq:not(:empty) { margin: 8px 0 4px; padding: 6px 10px; border: 2px solid var(--accent); border-radius: 8px; font-size: 13.5px; }
   #ui .mhint:not(:empty) { font-size: 12.5px; color: var(--accent); margin-top: 4px; }
-  #ui #next.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  #ui #next.pulse, #ui #back.pulse, #ui #play.pulse { animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(180,56,28,.35); } }
-  @media (prefers-reduced-motion: reduce) { #ui #next.pulse { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { #ui .pulse { animation: none !important; } }
   #ui details.va-sec { display: block; color: var(--ink); }
   #ui .ver { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); background: var(--chip); border: 1px solid var(--rule); border-radius: 4px; padding: 2px 5px; margin-left: 4px; }
   #ui table.vers { border-collapse: collapse; width: 100%; font-size: 12px; }
@@ -73,7 +73,9 @@
   <div id="mQuote" class="mquote"></div>
   <div id="mQ" class="mq"></div>
   <div id="mHint" class="mhint"></div>
-  <div class="row"><button id="back" disabled>◀ Back</button><button id="play" class="primary" disabled>▶ Play</button><button id="next" disabled>Next ▶</button></div>
+  <div class="row"><button id="play" class="primary" disabled>▶ Watch the eruption</button></div>
+  <div class="row"><button id="back" disabled>◀ Back</button><button id="next" disabled>Next ▶</button></div>
+  <div class="row"><button id="watchAll" hidden>↺ Watch the whole eruption again</button></div>
   <button id="restart" hidden></button><input id="scrub" type="range" hidden />
   <div class="row"><button id="standSS" disabled>Stand in San Sebastiano</button><button id="standPO" disabled>Stand in Pompei</button></div>
   <div class="row"><button id="standTable" disabled>Back to the table</button></div>
@@ -97,7 +99,7 @@
     <summary>Versions</summary>
     <table class="vers">
       <tr><th>Part</th><th>Version</th><th>What it is</th></tr>
-      <tr><td>App</td><td>VR story 0.2</td><td>0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>App</td><td>VR story 0.3</td><td>0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
       <tr><td>Lava model</td><td>1.0</td><td>DOWNFLOW-style steepest descent with hollow filling (same code as the lava explorer), run for the two 1944 flows; lava drawn where at least 1 in 5 flows went</td></tr>
       <tr><td>Lava look and timing</td><td>0.1</td><td>Cools from yellow-hot to a dark crust; one speed, timed so the northern flow reaches San Sebastiano early on 21 March. First numbered version</td></tr>
       <tr><td>Ash cloud and fountains</td><td>0.2</td><td>Illustration: eight fountains up to about 4 km, an ash column over 5 km blown east, then bursts under 2 km blown south-west. 0.2: those bursts lowered from 3 km (INGV)</td></tr>
@@ -318,7 +320,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR story 0.2";
+const VERSION = "VR story 0.3";
 const VERSIONS = { app: VERSION, lava: "1.0", lavaLook: "0.1", cloud: "0.2", ground: "0.1", sound: "0.1", archive: window.VesuviusArchive ? VesuviusArchive.version : "missing" };
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.replace("VR ", "")}</div>`);
@@ -365,7 +367,7 @@ const T = { start: 16.5,                                     // 16:30, 18 March:
   townArrival: 3 * 24 + 6 };                                 // "early on 21 March": the northern flow reaches San Sebastiano
 const TOTAL_H = T.end;
 // Playback: seconds given to each phase (lava phase gets the most)
-const SEG = [[T.start, T.fountains, 42], [T.fountains, T.column, 14], [T.column, T.phase4, 14], [T.phase4, T.end, 16]];   // the story plays one moment at a time
+const SEG = [[T.start, T.fountains, 42], [T.fountains, T.column, 14], [T.column, T.phase4, 14], [T.phase4, T.end, 16]];   // about 1½ minutes for the whole eruption
 const PLAY_S = SEG.reduce((s, g) => s + g[2], 0);
 function hoursAt(sec) { let s = sec; for (const [a, b, d] of SEG) { if (s <= d) return a + (b - a) * s / d; s -= d; } return T.end; }
 function secAt(hours) { let s = 0; for (const [a, b, d] of SEG) { if (hours <= b) return s + d * Math.max(0, hours - a) / (b - a); s += d; } return PLAY_S; }
@@ -897,15 +899,18 @@ const PHASE_TEXT = {
 
 // ---------------- Playback ----------------
 const pb = { sec: 0, playing: false, last: 0, phase: -1, townShown: false };
-function setPlaying(v) { pb.playing = v; if (v) { initSound(); $("next").classList.remove("pulse"); } syncPlay(); panelDirty = true; }
+function setPlaying(v) { pb.playing = v; if (v) initSound(); syncPlay(); panelDirty = true; }
 function restart() { pb.sec = 0; pb.phase = -1; pb.townShown = false; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } setPlaying(true); }
 function stepPlayback(now) {
   const dt = Math.min(0.05, (now - (pb.last || now)) / 1000); pb.last = now;
   if (!lava.arr) return;
-  if (pb.playing) {                                          // play to the end of this moment, then wait for Next
-    pb.sec = Math.min(story.endSec, pb.sec + dt);
-    if (pb.sec >= story.endSec) { setPlaying(false); momentDone(); } }
-  const h = story.m && story.m.h1 <= 0 ? 0 : hoursAt(pb.sec), st = stateAt(h);   // the first moment is before the eruption
+  if (pb.playing) {                                          // the whole eruption plays without stopping
+    if (story.hold > 0) story.hold -= dt;                    // a few seconds on the opening moment first
+    else pb.sec = Math.min(story.stopSec, pb.sec + dt);
+    if (story.mode === "watch" && story.hold <= 0) { const i = momentAtHour(hoursAt(pb.sec)); if (i !== story.cur) setMomentInfo(i); }
+    if (pb.sec >= story.stopSec) { setPlaying(false); if (story.mode === "watch") finishStory(); else { story.mode = "browse"; syncPlay(); } } }
+  const before = story.mode === "intro" || (story.mode === "watch" && story.hold > 0) || (story.mode === "browse" && story.cur === 0);
+  const h = before ? 0 : hoursAt(pb.sec), st = stateAt(h);   // the opening moment is before the eruption
   if (walk) stepWalk(dt, st);
   U.uT.value = h / TOTAL_H; U.uClock.value = now / 1000; U.uAshE.value = st.ashE; U.uAshW.value = st.ashW;
   stepParticles(dt, st);                                     // the eruption keeps moving while a moment waits
@@ -919,40 +924,55 @@ let scrubbing = false;
 $("scrub").oninput = () => { scrubbing = true; pb.sec = $("scrub").value / 1000 * PLAY_S; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } };
 $("scrub").onchange = () => { scrubbing = false; };
 $("play").onclick = () => {
-  if (!story.m || !story.m.dur) return;
-  clearTimeout(showMoment.t);                                // a click beats the automatic start
-  if (pb.playing) setPlaying(false);
-  else { if (pb.sec >= story.endSec) { pb.sec = secAt(story.m.h0); clearAll(); } setPlaying(true); }
+  if (pb.playing) { setPlaying(false); if (story.mode === "watch") story.mode = "paused"; syncPlay(); return; }
+  if (story.mode === "paused") { story.mode = "watch"; setPlaying(true); return; }
+  if (story.mode === "browse" && story.m && story.m.dur) {  // replay just this moment
+    story.mode = "part"; pb.sec = secAt(story.m.h0); story.stopSec = secAt(story.m.h1); story.hold = 0; clearAll(); setPlaying(true); return; }
+  watchAll();
 };
+function watchAll() {                                        // the whole eruption from the start
+  $("play").classList.remove("pulse"); $("back").classList.remove("pulse"); info("");
+  story.mode = "watch"; story.hold = 4; pb.sec = 0; story.stopSec = PLAY_S; clearAll(); setMomentInfo(0); setPlaying(true);
+}
 
 // ---------------- The story: eight moments (shared with the 3D story in vesuvius-1944-archive.js) ----------------
 const ARC = window.VesuviusArchive, MOMENTS = ARC && ARC.data && ARC.data.STORY ? ARC.data.STORY : [];
-const story = { cur: -1, m: null, endSec: 0 };
+const story = { cur: -1, m: null, mode: "intro", hold: 0, stopSec: PLAY_S, finished: false };
 function clearAll() { for (const p of [ashP, ftnP, localP]) if (p) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } }
 function quoteOf(m) { const v = m.ev && m.ev.voice != null && ARC.data.VOICES[m.ev.voice]; if (!v) return null;
   return v.quote ? { text: "“" + v.quote + "”", who: v.who + ", " + v.role + (v.when ? " · " + v.when : ""), src: v.src } : { text: v.para, who: v.who + ", " + v.role, src: v.src }; }
-function syncPlay() {
-  const m = story.m, done = m && pb.sec >= story.endSec;
-  $("play").disabled = !m || !m.dur; $("play").textContent = pb.playing ? "❚❚ Pause" : done && m && m.dur ? "↺ Again" : "▶ Play";
+function momentAtHour(h) { if (h >= T.end) return MOMENTS.length - 1; for (let i = 0; i < MOMENTS.length; i++) { const m = MOMENTS[i]; if (m.dur && h >= m.h0 && h < m.h1) return i; } return 0; }
+function playLabel() {
+  if (pb.playing) return "Pause";
+  if (story.mode === "paused") return "Keep watching";
+  if (story.mode === "browse" && story.m && story.m.dur) return "Replay this part";
+  return story.finished ? "Watch it all again" : "Watch the eruption";
 }
-function momentDone() { if (story.cur < MOMENTS.length - 1) $("next").classList.add("pulse"); syncPlay(); panelDirty = true; }
-function showMoment(i) {
-  if (i < 0 || i >= MOMENTS.length) return;
-  const m = MOMENTS[i]; story.cur = i; story.m = m; story.endSec = secAt(m.h1);
-  pb.sec = secAt(m.h0); clearAll(); setPlaying(false);
+function syncPlay() { $("play").disabled = !MOMENTS.length; $("play").textContent = (pb.playing ? "❚❚ " : "▶ ") + playLabel(); $("watchAll").hidden = !story.finished || story.mode === "watch"; }
+function setMomentInfo(i) {                                  // show moment i's text, quote and question (time is not changed)
+  const m = MOMENTS[i]; if (!m) return; story.cur = i; story.m = m;
   const q = quoteOf(m), esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   $("mWhen").textContent = `${i + 1} of ${MOMENTS.length} · ${m.when}`; $("mTitle").textContent = m.title; $("mText").textContent = m.text;
   $("mQuote").innerHTML = q ? `${esc(q.text)}<small>${esc(q.who)} · <a href="${q.src}" target="_blank" rel="noopener">Source</a></small>` : "";
   $("mQ").innerHTML = `<b>Think about it:</b> ${esc(m.q)}`; $("mHint").textContent = m.vrHint || "";
-  $("back").disabled = i === 0; $("next").disabled = i === MOMENTS.length - 1; $("next").textContent = i === 0 ? "Start ▶" : "Next ▶";
-  $("next").classList.toggle("pulse", i === 0);
+  $("back").disabled = i === 0; $("next").disabled = i === MOMENTS.length - 1;
   panelStory = { head: `${i + 1} OF ${MOMENTS.length} · ${m.when.toUpperCase()}`, title: m.title, text: m.text, quote: q, question: m.q, hint: m.vrHint || "" };
   panelDirty = true; syncPlay();
-  if (m.dur) { clearTimeout(showMoment.t); showMoment.t = setTimeout(() => { if (story.cur === i) setPlaying(true); }, 900); }
-  else momentDone();
+}
+function finishStory() {
+  story.finished = true; story.mode = "browse"; setMomentInfo(MOMENTS.length - 1);
+  info("<b>That was the whole eruption.</b> Now use Back and Next to look at each moment again, with its eyewitness and question, and replay any part.");
+  $("next").classList.remove("pulse"); $("back").classList.add("pulse"); syncPlay();
+}
+function showMoment(i) {                                     // open moment i to explore: paused on how it ended
+  if (i < 0 || i >= MOMENTS.length) return;
+  const m = MOMENTS[i]; setPlaying(false); story.mode = "browse"; story.hold = 0;
+  pb.sec = i === 0 ? 0 : m.dur ? Math.max(secAt(m.h0), secAt(m.h1) - 0.05) : PLAY_S; clearAll();
+  $("back").classList.remove("pulse"); info(""); setMomentInfo(i);
 }
 $("next").onclick = () => showMoment(story.cur + 1);
 $("back").onclick = () => showMoment(story.cur - 1);
+$("watchAll").onclick = () => watchAll();
 $("restart").onclick = () => restart();
 const toggles = { sound: false, ash: true, names: true };
 function setToggle(k, v) { toggles[k] = v; const btn = { sound: "sound", ash: "ashBtn", names: "names" }[k]; $(btn).setAttribute("aria-pressed", String(v));
@@ -1014,17 +1034,18 @@ function drawPanel() {
   pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText(VERSION, PW - 40 - pctx.measureText(VERSION).width, 95);
   for (let b = 0; b < BTN.length; b++) {
     const B = BTN[b]; let label = B.label, on = true;
-    if (B.id === "timeline") { pctx.fillStyle = "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+    if (B.id === "timeline") { pctx.fillStyle = b === hover && !pb.playing ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
       pctx.fillStyle = "#b4381c"; roundRect(B.x, B.y, Math.max(40, B.w * pb.sec / PLAY_S), B.h, 20); pctx.fill();
-      pctx.fillStyle = "#22201c"; pctx.font = "600 36px system-ui, sans-serif"; pctx.fillText(panelDate || "", B.x + 24, B.y + 48); continue; }
-    if (B.id === "play") { label = pb.playing ? "Pause" : (story.m && pb.sec >= story.endSec ? "Again" : "Play"); on = !!(story.m && story.m.dur); }
-    if (B.id === "next") { label = story.cur === 0 ? "Start" : "Next"; on = story.cur < MOMENTS.length - 1; }
+      pctx.fillStyle = "#22201c"; pctx.font = "600 36px system-ui, sans-serif";
+      pctx.fillText(story.finished && !pb.playing ? "Watch the whole eruption again" : panelDate || "", B.x + 24, B.y + 48); continue; }
+    if (B.id === "play") label = playLabel();
+    if (B.id === "next") on = story.cur < MOMENTS.length - 1;
     if (B.id === "back") on = story.cur > 0;
     if (["sound", "ash", "names"].includes(B.id)) on = toggles[B.id];
     if (["smaller", "bigger", "rotate", "reset"].includes(B.id)) on = !walk;
     if (B.id === "tbl") on = !!walk;
     if (B.id === "ss" || B.id === "po") on = !walk || walk.id !== B.id;
-    const strong = B.id === "next" && story.m && pb.sec >= story.endSec && on;       // Next glows once a moment has finished
+    const strong = B.id === "back" && story.finished && story.mode === "browse" && story.cur === MOMENTS.length - 1;   // after the whole eruption, Back leads into the moments
     pctx.fillStyle = (B.id === "play" || strong) ? (b === hover ? "#9b2f16" : "#b4381c") : (b === hover ? "#e2d9c7" : "#efe9dd"); roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
     pctx.globalAlpha = on ? 1 : 0.45; pctx.fillStyle = (B.id === "play" || strong) ? "#fff" : "#22201c"; pctx.font = "600 44px system-ui, sans-serif";
     if (pctx.measureText(label).width > B.w - 40) pctx.font = "600 34px system-ui, sans-serif";   // long labels shrink to fit
@@ -1066,7 +1087,7 @@ function pressButton(id, u) {
   if (id === "play") $("play").onclick();
   else if (id === "next") showMoment(story.cur + 1);
   else if (id === "back") showMoment(story.cur - 1);
-  else if (id === "timeline") return;                        // the clock shows the date; moments are chosen with Back and Next
+  else if (id === "timeline") { if (story.finished && !pb.playing) watchAll(); }   // the bar shows the date; after the eruption it replays it all
   else if (id === "sound" || id === "ash" || id === "names") setToggle(id, !toggles[id]);
   else if (id === "ss" || id === "po") enterWalk(id);
   else if (id === "tbl") leaveWalk();
@@ -1140,7 +1161,8 @@ renderer.setAnimationLoop(() => {
     $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Imagery: Esri World Imagery. Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Heights ×${EXAG} on the table, true height when standing in a town. ${VERSION}`;
     for (const id of ["standSS", "standPO"]) $(id).disabled = false;
     panelDate = fmtDate(T.start); $("date").textContent = panelDate; pb.sec = 0; pb.phase = 0; info("");
-    if (MOMENTS.length) showMoment(0); else info("The story couldn't load. Check your connection and reload.");
+    if (MOMENTS.length) { setMomentInfo(0); story.mode = "intro"; $("play").classList.add("pulse"); syncPlay(); }
+    else info("The story couldn't load. Check your connection and reload.");
     console.info("Vesuvius VR", VERSIONS, { grid: [W, H], elevation: el.source, imageryZoom: img.zoom, lavaCells: lava.cells.length, speed_m_per_h: Math.round(lava.speed), townReached: lava.townReached });
   } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
 })();
