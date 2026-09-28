@@ -39,7 +39,16 @@
     background: var(--accent) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
   #xr button[disabled], #xr a { display: none; }
   @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #ui .sub, details { display: none; } #credits { max-width: 90%; } }
+  #ui .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  #ui .btns button { flex: 1 1 auto; font-size: 12.5px; padding: 6px 8px; }
+  #ui .hint { font-size: 12px; color: var(--muted); }
+  #ui details.va-sec { display: block; color: var(--ink); }
+  #ui .ver { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); background: var(--chip); border: 1px solid var(--rule); border-radius: 4px; padding: 2px 5px; margin-left: 4px; }
+  #ui table.vers { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #ui table.vers td, #ui table.vers th { text-align: left; padding: 3px 4px; border-top: 1px solid var(--rule); vertical-align: top; }
 </style>
+<!-- 1944 newsreels, photos and eyewitness accounts: shared with the Vesuvius pages in jsawle/curriculum_artifacts -->
+<script src="https://jsawle.github.io/curriculum_artifacts/vesuvius-1944-archive.js"></script>
 </head>
 <body>
 <canvas id="three"></canvas>
@@ -53,6 +62,11 @@
   <div class="row"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
   <div id="date"></div>
   <div id="info">Loading the volcano…</div>
+  <details class="va-sec">
+    <summary>Evidence from 1944 <span class="ver va-ver">archive</span></summary>
+    <label style="display:block;margin:6px 0 2px;font-size:13px"><input type="checkbox" id="eVoices" checked onchange="VesuviusArchive.setCards(this.checked)" /> Show eyewitness accounts as it plays</label>
+    <div id="vaPanel"></div>
+  </details>
   <details>
     <summary>How this works</summary>
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
@@ -61,6 +75,14 @@
     <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Time runs at 3 minutes a second while the lava moves, so the front's speed is sped up. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano</a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction</a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)</a></p>
+  </details>
+  <details>
+    <summary>Versions</summary>
+    <table class="vers">
+      <tr><th>Part</th><th>Version</th><th>What it is</th></tr>
+      <tr><td>App</td><td>VR 0.4</td><td>0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
+    </table>
   </details>
 </div>
 <div id="xr"></div>
@@ -274,12 +296,12 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.3";
+const VERSION = "VR 0.4";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
 const LM = window.LavaModel;
 const $ = (id) => document.getElementById(id);
-let panelDirty = true, panelInfo = "", panelDate = "";
+let panelDirty = true, panelInfo = "", panelDate = "", panelMoment = null, panelMomentKey = "";
 const info = (html) => { $("info").innerHTML = html; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); panelDirty = true; };
 
 // ---------------- Area and grids ----------------
@@ -872,6 +894,11 @@ function stepPlayback(now) {
   const date = fmtDate(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; panelDirty = true; }
   if (st.phase !== pb.phase) { pb.phase = st.phase; info(PHASE_TEXT[st.phase]); }
   if (!pb.townShown && st.phase === 1 && h >= T.townArrival && lava.townReached) { pb.townShown = true; info(PHASE_TEXT[1] + "<br><b>Early on 21 March the lava reached San Sebastiano and Massa di Somma.</b>"); }
+  if (window.VesuviusArchive && VesuviusArchive.momentAt) {   // eyewitness accounts at the time they were written
+    const active = pb.sec > 0; VesuviusArchive.atHour(h, active);
+    const m = VesuviusArchive.momentAt(h, active), key = m ? m.when + m.text : "";
+    if (key !== panelMomentKey) { panelMomentKey = key; panelMoment = m; panelDirty = true; }
+  }
   if (!scrubbing) $("scrub").value = Math.round(pb.sec / PLAY_S * 1000);
 }
 let scrubbing = false;
@@ -918,7 +945,7 @@ renderer.xr.addEventListener("sessionend", () => {
 });
 
 // Floating 3D menu
-const PW = 1024, PH = 1200, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
+const PW = 1024, PH = 1560, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
 const pctx = panelCanvas.getContext("2d"), panelTex = new THREE.CanvasTexture(panelCanvas); panelTex.colorSpace = THREE.SRGBColorSpace;
 const PANEL_W = 0.34;
 const panel = new THREE.Mesh(new THREE.PlaneGeometry(PANEL_W, PANEL_W * PH / PW), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true }));
@@ -952,11 +979,17 @@ function drawPanel() {
     pctx.fillText(label, B.x + 28, B.y + B.h / 2 + 15); pctx.globalAlpha = 1;
   }
   pctx.fillStyle = "#22201c"; pctx.font = "36px system-ui, sans-serif"; wrap(panelInfo, 40, 850, PW - 80, 46);
+  if (panelMoment) {                                          // eyewitness account from the shared 1944 archive
+    const y0 = 1190; pctx.fillStyle = "#efe9dd"; roundRect(24, y0 - 50, PW - 48, 330, 24); pctx.fill();
+    pctx.fillStyle = "#b4381c"; pctx.font = "bold 28px system-ui, sans-serif"; pctx.fillText((panelMoment.who ? "EYEWITNESS · " : "PHOTOGRAPH · ") + panelMoment.when.toUpperCase(), 44, y0);
+    pctx.fillStyle = "#22201c"; pctx.font = "italic 34px Georgia, serif"; const y1 = wrap(panelMoment.text, 44, y0 + 50, PW - 88, 42);
+    if (panelMoment.who) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelMoment.who, 44, y1 + 44, PW - 88, 34); }
+  }
   pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
   panelTex.needsUpdate = true; panelDirty = false;
 }
 function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
-function wrap(text, x, y, maxW, lh) { const words = text.split(/\s+/); let line = "", yy = y; for (const w of words) { const t = line ? line + " " + w : w; if (pctx.measureText(t).width > maxW) { pctx.fillText(line, x, yy); line = w; yy += lh; } else line = t; } if (line) pctx.fillText(line, x, yy); }
+function wrap(text, x, y, maxW, lh) { const words = text.split(/\s+/); let line = "", yy = y; for (const w of words) { const t = line ? line + " " + w : w; if (pctx.measureText(t).width > maxW) { pctx.fillText(line, x, yy); line = w; yy += lh; } else line = t; } if (line) pctx.fillText(line, x, yy); return yy; }
 let needPlace = false;
 const head = new THREE.Vector3(), fwd = new THREE.Vector3();
 function placeAround() {
@@ -1057,6 +1090,12 @@ window.__ves = { enterWalk, leaveWalk, get walk() { return walk; }, get localP()
   btnWorld(id, u = 0.5) { const B = BTN.find(b => b.id === id); panel.updateMatrixWorld(true);
     const v = new THREE.Vector3(((B.x + B.w * u) / PW - 0.5) * PANEL_W, (0.5 - (B.y + B.h / 2) / PH) * PANEL_W * PH / PW, 0); return panel.localToWorld(v).toArray(); },
   aim(from, to) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...from), new THREE.Vector3(...to), new THREE.Vector3(0, 1, 0)); return new THREE.Quaternion().setFromRotationMatrix(m).toArray(); } };
+</script>
+<script>
+  if (window.VesuviusArchive) {
+    VesuviusArchive.mount({ panel: document.getElementById("vaPanel"), page: "vr", mapwrap: document.body });
+    document.querySelectorAll(".va-ver-n").forEach(el => { el.textContent = VesuviusArchive.version; });
+  } else document.getElementById("vaPanel").textContent = "The 1944 archive couldn't load.";
 </script>
 </body>
 </html>
