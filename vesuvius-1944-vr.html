@@ -99,7 +99,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR 0.7</td><td>0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace. In a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there) (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.8</td><td>0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
@@ -319,7 +319,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.7";
+const VERSION = "VR 0.8";
 const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
