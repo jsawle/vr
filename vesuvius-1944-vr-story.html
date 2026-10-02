@@ -81,7 +81,7 @@
 <div id="ui" role="region" aria-labelledby="appTitle">
   <h1 id="appTitle">Vesuvius, March 1944</h1>
   <div class="sub" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
-  <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
+  <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view. Standing in a town, drag to look around and scroll to zoom in.</div>
   <div id="mWhen" class="mwhen"></div>
   <div id="mTitle" class="mtitle">Loading…</div>
   <div id="mText" class="mtext"></div>
@@ -116,7 +116,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR story 0.4</td><td>0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>App</td><td>VR story 0.5</td><td>0.5: standing in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
       <tr><td>Lava model</td><td>1.0</td><td>DOWNFLOW-style steepest descent with hollow filling (same code as the lava explorer), run for the two 1944 flows; lava drawn where at least 1 in 5 flows went</td></tr>
       <tr><td>Lava look and timing</td><td>0.1</td><td>Cools from yellow-hot to a dark crust; one speed, timed so the northern flow reaches San Sebastiano early on 21 March. First numbered version</td></tr>
       <tr><td>Ash cloud and fountains</td><td>0.2</td><td>Illustration: eight fountains up to about 4 km, an ash column over 5 km blown east, then bursts under 2 km blown south-west. 0.2: those bursts lowered from 3 km (INGV)</td></tr>
@@ -341,7 +341,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR story 0.4";
+const VERSION = "VR story 0.5";
 const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 const VERSIONS = { app: VERSION, lava: "1.0", lavaLook: "0.1", cloud: "0.2", ground: "0.1", sound: "0.1", archive: window.VesuviusArchive ? VesuviusArchive.version : "missing" };
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
@@ -792,7 +792,7 @@ async function enterWalk(id) {
   table.position.set(hd.x - local.x, -local.y, hd.z - local.z);
   camera.near = 0.1; camera.far = 45000; camera.updateProjectionMatrix();
   if (!renderer.xr.isPresenting) { camera.position.set(0, 1.7, 0); controls.target.set(0, 1.7, -0.05); controls.minDistance = controls.maxDistance = 0.05;
-    controls.enableZoom = false; controls.enablePan = false; controls.rotateSpeed = -0.35; controls.maxPolarAngle = Math.PI * 0.95; controls.update(); }
+    controls.enableZoom = false; controls.enablePan = false; controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE; townFov(45); controls.rotateSpeed = -0.35; controls.maxPolarAngle = Math.PI * 0.95; controls.update(); }
   scene.fog = new THREE.Fog(0xa9bccd, 4000, 45000);
   clearAll(); say(SPOTS[id].note); panelDirty = true; syncWalkButtons();
 }
@@ -801,7 +801,7 @@ function leaveWalk() {
   if (patch) { model.remove(patch.ground, patch.over); patch = null; } terrain.geometry.setIndex(baseIdx); overlay.geometry.setIndex(baseIdx);
   setExag(EXAG); labels.visible = toggles.names; scene.fog = null; localP.age.fill(1e9); localP.D.fill(0); localP.da.needsUpdate = true;
   camera.near = 0.01; camera.far = 50; camera.updateProjectionMatrix();
-  controls.minDistance = 0.15; controls.maxDistance = 3; controls.enableZoom = controls.enablePan = true; controls.rotateSpeed = 1; controls.maxPolarAngle = Math.PI * 0.49;
+  controls.minDistance = 0.15; controls.maxDistance = 3; controls.enableZoom = controls.enablePan = true; controls.mouseButtons.RIGHT = THREE.MOUSE.PAN; townFov(45); controls.rotateSpeed = 1; controls.maxPolarAngle = Math.PI * 0.49;
   if (renderer.xr.isPresenting) { scene.background = isAR ? null : bg; floor.visible = !isAR; placeAround(); }
   else { scene.background = bg; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); controls.update(); }
   announce("Back to the table view."); panelDirty = true; syncWalkButtons();
@@ -1023,8 +1023,12 @@ function orbitBy(dTheta, dPhi) {
   _sph.theta += dTheta; _sph.phi = Math.max(controls.minPolarAngle + 0.01, Math.min(controls.maxPolarAngle, _sph.phi + dPhi));
   _off.setFromSpherical(_sph); camera.position.copy(controls.target).add(_off); controls.update();
 }
+// Standing in a town you stay on the spot, so zoom narrows the field of view (like binoculars) instead of moving you.
+// Wheel and + / − both do this; right-drag looks around like left-drag. (OrbitControls' own zoom and pan stay off there.)
+function townFov(f) { camera.fov = Math.max(8, Math.min(70, f)); camera.updateProjectionMatrix(); if (walk) controls.rotateSpeed = -0.35 * camera.fov / 45; }
+canvas.addEventListener("wheel", (e) => { if (!walk || renderer.xr.isPresenting) return; e.preventDefault(); townFov(camera.fov * (e.deltaY > 0 ? 1.12 : 1 / 1.12)); }, { passive: false });
 function zoomBy(f) {
-  if (walk) return;
+  if (walk) { townFov(camera.fov * f); return; }
   _off.copy(camera.position).sub(controls.target);
   const d = Math.max(controls.minDistance, Math.min(controls.maxDistance, _off.length() * f));
   _off.setLength(d); camera.position.copy(controls.target).add(_off); controls.update();
@@ -1038,7 +1042,7 @@ canvas.addEventListener("keydown", (e) => {
   else if (k === "ArrowDown") orbitBy(0, step * sign);
   else if (k === "+" || k === "=") zoomBy(0.85);
   else if (k === "-" || k === "_") zoomBy(1 / 0.85);
-  else if (k === "Home") { if (walk) { camera.position.set(0, 1.7, 0); controls.target.set(0, 1.7, -0.05); } else { camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); } controls.update(); }
+  else if (k === "Home") { if (walk) { camera.position.set(0, 1.7, 0); controls.target.set(0, 1.7, -0.05); townFov(45); } else { camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); } controls.update(); }
   else return;
   e.preventDefault();
 });
