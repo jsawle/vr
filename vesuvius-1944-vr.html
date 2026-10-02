@@ -90,7 +90,7 @@
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
     <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colours show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
     <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate over 10 km at the peak. The wind carried ash 15–20 km east. Smaller explosions blew ash to the south-west until 29 March. The particles, fountain height and the shape of the grey ash on the ground are illustrations that follow those directions and distances.</p>
-    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Time runs at 3 minutes a second while the lava moves, so the front's speed is sped up. The falling ash is an illustration.</p>
+    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Standing in a town only changes your view: the eruption carries on from the same moment, at the same pace as on the table, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)<span class="sr-only"> (opens in a new tab, PDF)</span></a></p>
   </details>
@@ -99,7 +99,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR 0.6</td><td>0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.7</td><td>0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
@@ -319,7 +319,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.6";
+const VERSION = "VR 0.7";
 const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
@@ -688,7 +688,6 @@ function stepParticles(dt, st) {
 // ---------------- Life size: stand in a town ----------------
 // The model is scaled to real size (heights not exaggerated) with you standing on the ground, facing the volcano.
 // Near you, a 3.2 km patch gets 10 m terrain steps and sharper satellite imagery (the elevation data itself is ~30 m).
-const WALK_RATE_LAVA = 0.05, WALK_RATE_LATER = 1.0;          // hours of 1944 per second: 3 minutes a second while the lava moves
 const PATCH = 3200, PSTEP = 10, PATCH_Z = 16;
 const SPOTS = {
   ss: { name: "San Sebastiano", town: TOWNS[0], note: "You are standing on the edge of San Sebastiano, beside where the model's northern lava flow arrives. The volcano is in front of you." },
@@ -771,9 +770,10 @@ async function enterWalk(id) {
   if (!renderer.xr.isPresenting) { camera.position.set(0, 1.7, 0); controls.target.set(0, 1.7, -0.05); controls.minDistance = controls.maxDistance = 0.05;
     controls.enableZoom = false; controls.enablePan = false; controls.rotateSpeed = -0.35; controls.maxPolarAngle = Math.PI * 0.95; controls.update(); }
   scene.fog = new THREE.Fog(0xa9bccd, 4000, 45000);
-  pb.sec = secAt(Math.max(T.start, s.start)); for (const p of [ashP, ftnP, localP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; }
-  pb.phase = stateAt(hoursAt(pb.sec)).phase;                // keep the town note on screen with the current stage (it used to be overwritten next frame)
-  setPlaying(true); say(SPOTS[id].note + "<br>" + PHASE_TEXT[pb.phase]); panelDirty = true; syncWalkButtons();
+  // Only the view changes: the eruption carries on from the same moment, playing or paused as it was (0.7; it used to jump in time)
+  localP.age.fill(1e9); localP.D.fill(0); localP.da.needsUpdate = true;
+  pb.phase = (pb.sec === 0 && !pb.playing) ? 0 : stateAt(hoursAt(pb.sec)).phase;   // keep the town note on screen with the current stage
+  say(SPOTS[id].note + "<br>" + PHASE_TEXT[pb.phase]); panelDirty = true; syncWalkButtons();
 }
 function leaveWalk() {
   if (!walk) return; walk = null;
@@ -783,7 +783,7 @@ function leaveWalk() {
   controls.minDistance = 0.15; controls.maxDistance = 3; controls.enableZoom = controls.enablePan = true; controls.rotateSpeed = 1; controls.maxPolarAngle = Math.PI * 0.49;
   if (renderer.xr.isPresenting) { scene.background = isAR ? null : bg; floor.visible = !isAR; placeAround(); }
   else { scene.background = bg; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); controls.update(); }
-  announce("Back to the table view."); panelDirty = true; syncWalkButtons();
+  info(PHASE_TEXT[pb.phase]); announce("Back to the table view."); panelDirty = true; syncWalkButtons();   // the town note no longer applies
 }
 // falling ash around you, and the sky darkening under the plume
 let skyAsh = 0;
@@ -911,8 +911,7 @@ function stepPlayback(now) {
   const dt = Math.min(0.05, (now - (pb.last || now)) / 1000); pb.last = now;
   if (!lava.arr) return;
   if (pb.playing) {
-    if (walk) { const h0 = hoursAt(pb.sec), rate = h0 < T.fountains ? WALK_RATE_LAVA : WALK_RATE_LATER; pb.sec = secAt(Math.min(T.end, h0 + rate * dt)); }
-    else pb.sec = Math.min(PLAY_S, pb.sec + dt);
+    pb.sec = Math.min(PLAY_S, pb.sec + dt);                  // same pace on the table and standing in a town (0.7)
     if (pb.sec >= PLAY_S) setPlaying(false); }
   const h = hoursAt(pb.sec), st = stateAt(h);
   if (walk) stepWalk(dt, st);
