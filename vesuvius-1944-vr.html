@@ -1023,6 +1023,7 @@ function drawPanel() {
   pctx.fillStyle = "rgba(255,253,248,0.95)"; roundRect(0, 0, PW, PH, 40); pctx.fill();
   pctx.fillStyle = "#22201c"; pctx.font = "bold 56px system-ui, sans-serif"; pctx.fillText("Vesuvius, March 1944", 40, 95);
   pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText(VERSION, PW - 40 - pctx.measureText(VERSION).width, 95);
+  pctx.fillStyle = "#6b665c"; pctx.font = "600 24px system-ui, sans-serif"; pctx.fillText(CREDIT_TAG, PW - 40 - pctx.measureText(CREDIT_TAG).width, 130);   // credit tag, under the version
   for (let b = 0; b < BTN.length; b++) {
     const B = BTN[b]; let label = B.label, on = true;
     if (B.id === "timeline") { pctx.fillStyle = "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
@@ -1045,7 +1046,6 @@ function drawPanel() {
     if (panelMoment.who) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelMoment.who, 44, y1 + 44, PW - 88, 34); }
   }
   pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
-  pctx.font = "600 26px system-ui, sans-serif"; pctx.fillText(CREDIT_TAG, PW - 40 - pctx.measureText(CREDIT_TAG).width, PH - 70);
   panelTex.needsUpdate = true; panelDirty = false;
 }
 function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
