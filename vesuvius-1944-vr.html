@@ -13,9 +13,10 @@
 } }
 </script>
 <style>
-  :root { --panel: rgba(255,253,248,.94); --ink: #22201c; --muted: #6b665c; --rule: #ddd6c8; --accent: #b4381c; --chip: #efe9dd; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #e0643f; --chip: #2b2823; } }
-  :root[data-theme="dark"] { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #e0643f; --chip: #2b2823; }
+  /* --accent is for text and lines; --accent-btn is the fill behind white button text (5.9:1 in both themes) */
+  :root { --panel: rgba(255,253,248,.94); --ink: #22201c; --muted: #6b665c; --rule: #ddd6c8; --accent: #b4381c; --accent-btn: #b4381c; --chip: #efe9dd; --focus: #b4381c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #f07a55; --chip: #2b2823; --focus: #ffb59c; } }
+  :root[data-theme="dark"] { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #f07a55; --chip: #2b2823; --focus: #ffb59c; }
   html, body { margin: 0; height: 100%; background: #1c1b19; color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
   canvas#three { display: block; width: 100%; height: 100%; touch-action: none; }
   #ui { position: absolute; left: 12px; top: 12px; width: 310px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.3); }
@@ -24,21 +25,32 @@
   .row { display: flex; gap: 6px; margin-top: 6px; }
   .row > * { flex: 1; }
   button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); }
-  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
-  button[aria-pressed="false"] { opacity: .55; }
+  button.primary { background: var(--accent-btn); color: #fff; border-color: transparent; }
+  /* on/off shown by a tick and a filled background, not by fading the text (keeps text contrast) */
+  button[aria-pressed="true"]::before { content: "✓ "; }
+  button[aria-pressed="false"] { background: transparent; border-style: dashed; }
   button:disabled { opacity: .45; cursor: default; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  canvas#three:focus-visible { outline-offset: -4px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   input[type=range] { width: 100%; accent-color: var(--accent); margin: 10px 0 0; }
   #date { font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 8px; }
   #info { margin-top: 4px; font-size: 13.5px; min-height: 4.2em; }
   details { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
   details summary { cursor: pointer; font-weight: 600; color: var(--ink); }
   details a { color: inherit; }
-  #credits { position: absolute; right: 8px; bottom: 6px; pointer-events: none; font-size: 11px; color: #d8d2c6; text-shadow: 0 1px 2px #000; max-width: 60%; text-align: right; }
+  /* bottom-right credit box: solid background so the text keeps its contrast over the sky, ash and imagery */
+  #creditBox { position: absolute; right: 8px; bottom: 6px; max-width: 60%; text-align: right; font-size: 11px; line-height: 1.35; color: #ece8df;
+    background: rgba(20,18,16,.82); border-radius: 6px; padding: 4px 8px; }
+  #creditBox p { margin: 0; }
+  #madeby { font-weight: 600; }
   #xr { position: absolute; left: 50%; bottom: 52px; z-index: 2; transform: translateX(-50%); display: flex; gap: 10px; }
   #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
-    background: var(--accent) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
+    background: var(--accent-btn) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
   #xr button[disabled], #xr a { display: none; }
-  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #ui .sub, details { display: none; } #credits { max-width: 90%; } }
+  /* small screens and 400% zoom: keep everything available (sections stay collapsed rather than hidden) */
+  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #creditBox { max-width: calc(100% - 16px); } }
+  @media (forced-colors: active) { #creditBox { border: 1px solid CanvasText; } button[aria-pressed="false"] { border-style: dashed; } }
   #ui .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #ui .btns button { flex: 1 1 auto; font-size: 12.5px; padding: 6px 8px; }
   #ui .hint { font-size: 12px; color: var(--muted); }
@@ -51,18 +63,23 @@
 <script src="https://jsawle.github.io/curriculum_artifacts/vesuvius-1944-archive.js"></script>
 </head>
 <body>
-<canvas id="three"></canvas>
-<div id="ui">
+<main>
+<canvas id="three" tabindex="0" role="application" aria-roledescription="3D model" aria-label="3D model of Vesuvius and the surrounding towns" aria-describedby="modelDesc keysHelp"></canvas>
+<p id="modelDesc" class="sr-only">A 3D model of Vesuvius, Monte Somma and the plain to the east, made from satellite images and elevation data. When the eruption plays, lava flows spread north towards San Sebastiano and south-east, lava fountains rise from the crater, and an ash column drifts east and then south-west. The panel describes each stage in words as it happens.</p>
+<div id="ui" role="region" aria-labelledby="appTitle">
   <div style="background:var(--chip);border-left:4px solid var(--accent);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px"><b>New:</b> <a href="vesuvius-1944-vr-story.html" style="color:var(--accent);font-weight:600">a step-by-step version</a> that pauses at each moment of the eruption.</div>
-  <h1>Vesuvius, March 1944</h1>
-  <div class="sub">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
-  <div class="row"><button id="play" class="primary" disabled>▶ Play</button><button id="restart" disabled>Restart</button></div>
-  <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Time" disabled />
-  <div class="row"><button id="standSS" disabled>Stand in San Sebastiano</button><button id="standPO" disabled>Stand in Pompei</button></div>
+  <h1 id="appTitle">Vesuvius, March 1944</h1>
+  <div class="sub" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
+  <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
+  <div class="row"><button id="play" class="primary" disabled><span aria-hidden="true">▶ </span>Play</button><button id="restart" disabled>Restart</button></div>
+  <label for="scrub" class="sr-only">Eruption timeline</label>
+  <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-valuetext="18 March 1944" disabled />
+  <div class="row"><button id="standSS" aria-pressed="false" disabled>Stand in San Sebastiano</button><button id="standPO" aria-pressed="false" disabled>Stand in Pompei</button></div>
   <div class="row"><button id="standTable" disabled>Back to the table</button></div>
-  <div class="row"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
+  <div class="row" role="group" aria-label="Show or hide"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
   <div id="date"></div>
   <div id="info">Loading the volcano…</div>
+  <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <details class="va-sec">
     <summary>Evidence from 1944 <span class="ver va-ver">archive</span></summary>
     <label style="display:block;margin:6px 0 2px;font-size:13px"><input type="checkbox" id="eVoices" checked onchange="VesuviusArchive.setCards(this.checked)" /> Show eyewitness accounts as it plays</label>
@@ -75,19 +92,24 @@
     <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate over 10 km at the peak. The wind carried ash 15–20 km east. Smaller explosions blew ash to the south-west until 29 March. The particles, fountain height and the shape of the grey ash on the ground are illustrations that follow those directions and distances.</p>
     <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Time runs at 3 minutes a second while the lava moves, so the front's speed is sped up. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
-    <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano</a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction</a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)</a></p>
+    <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)<span class="sr-only"> (opens in a new tab, PDF)</span></a></p>
   </details>
   <details>
     <summary>Versions</summary>
     <table class="vers">
-      <tr><th>Part</th><th>Version</th><th>What it is</th></tr>
-      <tr><td>App</td><td>VR 0.5</td><td>0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <caption class="sr-only">Version numbers of the app and its parts</caption>
+      <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
+      <tr><td>App</td><td>VR 0.6</td><td>0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
 </div>
 <div id="xr"></div>
-<div id="credits"></div>
+</main>
+<footer id="creditBox">
+  <p id="madeby">Created by Jason Sawle · © Esri 2026</p>
+  <p id="credits"></p>
+</footer>
 
 <script>
 /* Lava flow model — DOWNFLOW-style probabilistic steepest descent.
@@ -297,13 +319,19 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.5";
+const VERSION = "VR 0.6";
+const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
-document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px;opacity:.7">Version ${VERSION.slice(3)}</div>`);
+document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
 const LM = window.LavaModel;
 const $ = (id) => document.getElementById(id);
 let panelDirty = true, panelInfo = "", panelDate = "", panelMoment = null, panelMomentKey = "";
 const info = (html) => { $("info").innerHTML = html; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); panelDirty = true; };
+// Screen-reader announcements: only for real changes (a new stage, arriving in a town), never for loading percentages
+let lastSaid = "";
+const announce = (html) => { const t = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); if (t === lastSaid) return; lastSaid = t;
+  const el = $("announce"); el.textContent = ""; setTimeout(() => { el.textContent = t; }, 50); };
+const say = (html) => { info(html); announce(html); };
 
 // ---------------- Area and grids ----------------
 // Vesuvius, Monte Somma and the plain to the east where the 1944 ash fell. Local metres: x east, y north (Three.js z = -y).
@@ -744,7 +772,8 @@ async function enterWalk(id) {
     controls.enableZoom = false; controls.enablePan = false; controls.rotateSpeed = -0.35; controls.maxPolarAngle = Math.PI * 0.95; controls.update(); }
   scene.fog = new THREE.Fog(0xa9bccd, 4000, 45000);
   pb.sec = secAt(Math.max(T.start, s.start)); for (const p of [ashP, ftnP, localP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; }
-  setPlaying(true); info(SPOTS[id].note); panelDirty = true; syncWalkButtons();
+  pb.phase = stateAt(hoursAt(pb.sec)).phase;                // keep the town note on screen with the current stage (it used to be overwritten next frame)
+  setPlaying(true); say(SPOTS[id].note + "<br>" + PHASE_TEXT[pb.phase]); panelDirty = true; syncWalkButtons();
 }
 function leaveWalk() {
   if (!walk) return; walk = null;
@@ -754,7 +783,7 @@ function leaveWalk() {
   controls.minDistance = 0.15; controls.maxDistance = 3; controls.enableZoom = controls.enablePan = true; controls.rotateSpeed = 1; controls.maxPolarAngle = Math.PI * 0.49;
   if (renderer.xr.isPresenting) { scene.background = isAR ? null : bg; floor.visible = !isAR; placeAround(); }
   else { scene.background = bg; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); controls.update(); }
-  panelDirty = true; syncWalkButtons();
+  announce("Back to the table view."); panelDirty = true; syncWalkButtons();
 }
 // falling ash around you, and the sky darkening under the plume
 let skyAsh = 0;
@@ -876,7 +905,7 @@ const PHASE_TEXT = {
 
 // ---------------- Playback ----------------
 const pb = { sec: 0, playing: false, last: 0, phase: -1, townShown: false };
-function setPlaying(v) { pb.playing = v; if (v) initSound(); $("play").textContent = v ? "❚❚ Pause" : "▶ Play"; panelDirty = true; }
+function setPlaying(v) { pb.playing = v; if (v) initSound(); $("play").innerHTML = v ? '<span aria-hidden="true">❚❚ </span>Pause' : '<span aria-hidden="true">▶ </span>Play'; panelDirty = true; }
 function restart() { pb.sec = 0; pb.phase = -1; pb.townShown = false; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } setPlaying(true); }
 function stepPlayback(now) {
   const dt = Math.min(0.05, (now - (pb.last || now)) / 1000); pb.last = now;
@@ -892,9 +921,10 @@ function stepPlayback(now) {
   const sc = table.scale.x; glow.distance = 0.35 * sc;
   glow.intensity = 0.12 * st.glow * (0.8 + 0.2 * Math.sin(now / 90) * Math.sin(now / 37)) * Math.pow(sc, 1.5);
   stepSound(st, pb.playing && snd.on);
-  const date = fmtDate(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; panelDirty = true; }
-  if (st.phase !== pb.phase) { pb.phase = st.phase; info(PHASE_TEXT[st.phase]); }
-  if (!pb.townShown && st.phase === 1 && h >= T.townArrival && lava.townReached) { pb.townShown = true; info(PHASE_TEXT[1] + "<br><b>Early on 21 March the lava reached San Sebastiano and Massa di Somma.</b>"); }
+  const date = fmtDate(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; $("scrub").setAttribute("aria-valuetext", date); panelDirty = true; }
+  const shown = (pb.sec === 0 && !pb.playing) ? 0 : st.phase;   // before Play, keep "Press Play…" (it used to be overwritten next frame)
+  if (shown !== pb.phase) { pb.phase = shown; say(PHASE_TEXT[shown]); }
+  if (!pb.townShown && st.phase === 1 && h >= T.townArrival && lava.townReached) { pb.townShown = true; say(PHASE_TEXT[1] + "<br><b>Early on 21 March the lava reached San Sebastiano and Massa di Somma.</b>"); }
   if (window.VesuviusArchive && VesuviusArchive.momentAt) {   // eyewitness accounts at the time they were written
     const active = pb.sec > 0; VesuviusArchive.atHour(h, active);
     const m = VesuviusArchive.momentAt(h, active), key = m ? m.when + m.text : "";
@@ -920,6 +950,34 @@ $("standTable").onclick = () => leaveWalk();
 $("ashBtn").onclick = () => setToggle("ash", !toggles.ash);
 $("names").onclick = () => setToggle("names", !toggles.names);
 
+// Keyboard control of the model (only while the model has focus, so no keys are taken from the rest of the page):
+// arrows turn it (or look around when standing in a town), + / − zoom, Home resets the view.
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+function orbitBy(dTheta, dPhi) {
+  _off.copy(camera.position).sub(controls.target); _sph.setFromVector3(_off);
+  _sph.theta += dTheta; _sph.phi = Math.max(controls.minPolarAngle + 0.01, Math.min(controls.maxPolarAngle, _sph.phi + dPhi));
+  _off.setFromSpherical(_sph); camera.position.copy(controls.target).add(_off); controls.update();
+}
+function zoomBy(f) {
+  if (walk) return;
+  _off.copy(camera.position).sub(controls.target);
+  const d = Math.max(controls.minDistance, Math.min(controls.maxDistance, _off.length() * f));
+  _off.setLength(d); camera.position.copy(controls.target).add(_off); controls.update();
+}
+canvas.addEventListener("keydown", (e) => {
+  if (renderer.xr.isPresenting) return;
+  const step = Math.PI / 24, k = e.key, sign = walk ? -1 : 1;   // standing in a town, the camera turns on the spot, so the direction flips
+  if (k === "ArrowLeft") orbitBy(-step * sign, 0);
+  else if (k === "ArrowRight") orbitBy(step * sign, 0);
+  else if (k === "ArrowUp") orbitBy(0, -step * sign);
+  else if (k === "ArrowDown") orbitBy(0, step * sign);
+  else if (k === "+" || k === "=") zoomBy(0.85);
+  else if (k === "-" || k === "_") zoomBy(1 / 0.85);
+  else if (k === "Home") { if (walk) { camera.position.set(0, 1.7, 0); controls.target.set(0, 1.7, -0.05); } else { camera.position.set(0.05, 0.7, 0.85); controls.target.set(0.02, 0.05, 0); } controls.update(); }
+  else return;
+  e.preventDefault();
+});
+
 // ---------------- WebXR ----------------
 const xrBox = $("xr");
 if (navigator.xr) (async () => {
@@ -929,7 +987,7 @@ if (navigator.xr) (async () => {
     new MutationObserver(f).observe(btn, { childList: true, characterData: true, subtree: true }); f(); };
   if (arOK) { const ar = ARButton.createButton(renderer, opts); xrBox.append(ar); label(ar, "View on your table"); ar.addEventListener("click", initSound); }
   if (vrOK) { const vr = VRButton.createButton(renderer, opts); xrBox.append(vr); label(vr, "Enter VR"); vr.addEventListener("click", initSound); }
-  if (arOK || vrOK) $("ui").querySelector(".sub").textContent = "Press \"View on your table\" to put the volcano on a real table, or \"Enter VR\".";
+  if (arOK || vrOK) $("howTo").textContent = "Press \"View on your table\" to put the volcano on a real table, or \"Enter VR\".";
 })();
 const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 48).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a362f }));
 floor.visible = false; scene.add(floor);
@@ -987,6 +1045,7 @@ function drawPanel() {
     if (panelMoment.who) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelMoment.who, 44, y1 + 44, PW - 88, 34); }
   }
   pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
+  pctx.font = "600 26px system-ui, sans-serif"; pctx.fillText(CREDIT_TAG, PW - 40 - pctx.measureText(CREDIT_TAG).width, PH - 70);
   panelTex.needsUpdate = true; panelDirty = false;
 }
 function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
@@ -1080,10 +1139,10 @@ renderer.setAnimationLoop(() => {
     glow = new THREE.PointLight(0xff6a1a, 0, 0.35, 1.5); { const p = new Float32Array(3); tpos(cx, cy, top + 300, p, 0); glow.position.set(p[0], p[1], p[2]); } table.add(glow);
     $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Imagery: Esri World Imagery. Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Heights ×${EXAG} on the table, true height when standing in a town. ${VERSION}`;
     for (const id of ["play", "restart", "scrub", "standSS", "standPO"]) $(id).disabled = false;
-    panelDate = fmtDate(T.start); $("date").textContent = panelDate; pb.sec = 0;
-    info(PHASE_TEXT[0]); pb.phase = 0;
+    panelDate = fmtDate(T.start); $("date").textContent = panelDate; $("scrub").setAttribute("aria-valuetext", panelDate); pb.sec = 0;
+    say("The model is ready. " + PHASE_TEXT[0]); pb.phase = 0;
     console.info("Vesuvius VR", VERSION, { grid: [W, H], elevation: el.source, imageryZoom: img.zoom, lavaCells: lava.cells.length, speed_m_per_h: Math.round(lava.speed), townReached: lava.townReached });
-  } catch (e) { console.error(e); info("Couldn't load the map data. Check your connection and reload."); }
+  } catch (e) { console.error(e); say("Couldn't load the map data. Check your connection and reload."); }
 })();
 // Test hooks (used by automated tests; harmless otherwise)
 window.__ves = { enterWalk, leaveWalk, get walk() { return walk; }, get localP() { return localP; }, camera, simulate(sec) { const st = stateAt(hoursAt(pb.sec)); for (let t = 0; t < sec; t += 1 / 60) stepParticles(1 / 60, st); }, renderer, scene, table, panel, BTN, ctrls, hitButton, pb, lava, U, get ashP() { return ashP; }, get ftnP() { return ftnP; }, snd, stateAt, hoursAt, PLAY_S,
