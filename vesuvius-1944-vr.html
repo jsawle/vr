@@ -90,7 +90,7 @@
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
     <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colours show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
     <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate over 10 km at the peak. The wind carried ash 15–20 km east. Smaller explosions blew ash to the south-west until 29 March. The particles, fountain height and the shape of the grey ash on the ground are illustrations that follow those directions and distances.</p>
-    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. You start at eye level in the town and can move anywhere, as on the table. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Standing in a town only changes your view: the eruption carries on from the same moment, at the same pace as on the table, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
+    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. You start at eye level in the town and can move anywhere, as on the table. Go more than about 2 km up and the daylight sky fades to the dark table background. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, an estimate from the 10 million m³ of lava recorded for 1944 spread over the model's flows. Standing in a town only changes your view: the eruption carries on from the same moment, at the same pace as on the table, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)<span class="sr-only"> (opens in a new tab, PDF)</span></a></p>
   </details>
@@ -99,7 +99,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR 0.10</td><td>0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.11</td><td>0.11: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
@@ -319,7 +319,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.10";
+const VERSION = "VR 0.11";
 const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
@@ -796,8 +796,10 @@ function ashFallAt(x, y, st) {
 function stepWalk(dt, st) {
   const fall = toggles.ash ? ashFallAt(walk.x, walk.y, st) : 0;
   skyAsh += (fall - skyAsh) * Math.min(1, dt * 0.5);
-  _sky.copy(SKY).lerp(ASHSKY, Math.min(1, skyAsh * 1.3)); scene.background = _sky.clone();
-  if (scene.fog) { scene.fog.color.copy(_sky); scene.fog.near = 4000 - 3700 * skyAsh; scene.fog.far = 45000 - 39000 * skyAsh; }
+  // flown well up and away from the ground: fade from daylight to the table's dark background and lift the haze (1.5-2.5 km up)
+  const hUp = renderer.xr.isPresenting ? 0 : heightAboveGround(), up = Math.min(1, Math.max(0, (hUp - 1500) / 1000)), upS = up * up * (3 - 2 * up);
+  _sky.copy(SKY).lerp(ASHSKY, Math.min(1, skyAsh * 1.3)).lerp(bg, upS); scene.background = _sky.clone();
+  if (scene.fog) { scene.fog.color.copy(_sky); scene.fog.near = 4000 - 3700 * skyAsh + upS * 200000; scene.fog.far = 45000 - 39000 * skyAsh + upS * 400000; }
   if (!pb.playing) return;
   const p = localP, wb = st.windB * Math.PI / 180;
   p.acc = (p.acc || 0) + fall * 90 * dt;
@@ -969,10 +971,16 @@ function townView() {
   const dx = craterXYZ[0] - walk.x, dy = craterXYZ[1] - walk.y, L = Math.hypot(dx, dy) || 1, tx = walk.x + dx / L * 800, ty = walk.y + dy / L * 800;
   camera.position.copy(worldOf(walk.x, walk.y, walk.g + 1.7)); controls.target.copy(worldOf(tx, ty, hBil(tx, ty))); controls.update();
 }
+function heightAboveGround() {                               // metres between the camera and the ground below it
+  _cp.copy(camera.position); table.worldToLocal(_cp);
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, z = _cp.y / (SCALE * exag) + HBASE;
+  return z - (x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX ? hBil(x, y) : 0);
+}
 function keepAboveGround() {
   _cp.copy(camera.position); table.worldToLocal(_cp);
-  const x = _cp.x / SCALE, y = -_cp.z / SCALE; if (x < XMIN || x > XMAX || y < YMIN || y > YMAX) return;
-  const minY = (hBil(x, y) + 2 - HBASE) * SCALE * exag; if (_cp.y >= minY) return;
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, inside = x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX;
+  // beyond the model's edges, sea level counts as the ground (0.11: it used to let you sink below)
+  const minY = ((inside ? hBil(x, y) : 0) + 2 - HBASE) * SCALE * exag; if (_cp.y >= minY) return;
   _cp.y = minY; table.localToWorld(_cp); camera.position.y = _cp.y;   // lift only the camera (moving the target too made it creep upwards)
 }
 function zoomBy(f) {
