@@ -58,7 +58,7 @@
   #ui .ver { font: 600 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); background: var(--chip); border: 1px solid var(--rule); border-radius: 4px; padding: 2px 5px; margin-left: 4px; }
   #ui table.vers { border-collapse: collapse; width: 100%; font-size: 12px; }
   #ui table.vers td, #ui table.vers th { text-align: left; padding: 3px 4px; border-top: 1px solid var(--rule); vertical-align: top; }
-  /* predict, watch, compare activity (lab 0.1) */
+  /* predict, watch, compare activity (lab 0.2) */
   #act { margin: 4px 0 8px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 10px; background: var(--chip); }
   #act h2 { font-size: 15px; margin: 0 0 4px; }
   #act .steps { display: flex; gap: 4px; list-style: none; margin: 0 0 6px; padding: 0; font-size: 12px; }
@@ -66,12 +66,12 @@
   #act .steps li[aria-current="step"] { color: var(--ink); font-weight: 700; border-color: var(--accent); }
   #act fieldset { border: 0; margin: 6px 0 0; padding: 0; }
   #act legend { font-weight: 600; font-size: 13px; padding: 0; margin-bottom: 4px; }
-  #act .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  #act .tgrid button { font-size: 11.5px; padding: 5px 4px; font-weight: 600; }
-  #act .tgrid button[aria-pressed="false"] { background: var(--panel); border-style: solid; }
-  #act .tgrid button[aria-pressed="true"] { background: var(--accent-btn); color: #fff; border-color: transparent; }
-  #act label.l { display: block; font-size: 12.5px; margin: 6px 0 2px; }
-  #act textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); color: var(--ink); padding: 4px 6px; }
+  #act .opts { display: grid; gap: 4px; }
+  #ui details.help { margin: 0 0 6px; font-size: 12.5px; } #ui details.help .sub { margin: 4px 0 0; }
+  #act .opts.two { grid-template-columns: 1fr 1fr; }
+  #act .opts label { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.3; padding: 4px 6px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); cursor: pointer; }
+  #act .opts label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+  #act .opts input { accent-color: var(--accent); margin: 1px 0 0; flex: none; }
   #act p { margin: 4px 0; font-size: 13px; }
   #act .q { border-left: 3px solid var(--accent); padding-left: 8px; }
   #act table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 4px 0 6px; }
@@ -91,17 +91,18 @@
 <div id="ui" role="region" aria-labelledby="appTitle">
   <div style="background:var(--chip);border-left:4px solid var(--accent);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px"><b>Lab version</b> for testing a predict, watch and compare activity. <a href="vesuvius-1944-vr.html" style="color:var(--accent);font-weight:600">Open the original app</a>.</div>
   <h1 id="appTitle">Vesuvius, March 1944</h1>
+  <details class="help"><summary>How to move the model</summary>
   <div class="sub" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
   <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
+  </details>
   <section id="act" aria-labelledby="actTitle">
     <h2 id="actTitle">Predict, watch, compare</h2>
     <ol class="steps" aria-label="Activity steps"><li id="st1" aria-current="step">1 Predict</li><li id="st2">2 Watch</li><li id="st3">3 Compare</li></ol>
     <div id="actPredict">
-      <p>Before you watch, look at the model. Where do you think the 1944 eruption did harm?</p>
-      <fieldset><legend>Which towns will the lava reach?</legend><div class="tgrid" id="pLava"></div></fieldset>
-      <fieldset><legend>Which towns will the ash fall on?</legend><div class="tgrid" id="pAsh"></div></fieldset>
-      <label class="l" for="pWhy">Why do you think so? (optional; not saved or sent anywhere)</label>
-      <textarea id="pWhy" rows="2"></textarea>
+      <p><b>Lava is pouring over the north rim of the crater.</b> Turn the model and look at the ground. Where do you think the lava will go?</p>
+      <p class="small">Tap the model where you think it will stop, or choose below.</p>
+      <fieldset><legend>Where will it go?</legend><div class="opts two" id="pDir"></div></fieldset>
+      <fieldset><legend>Why there?</legend><div class="opts two" id="pWhy"></div></fieldset>
       <div class="row"><button id="lockIn" class="primary" disabled>Lock in and watch</button><button id="skipPredict" disabled>Just watch</button></div>
     </div>
     <div id="actWatch" hidden>
@@ -139,8 +140,8 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App (lab)</td><td>VR lab 0.1</td><td>Test copy of Vesuvius VR 0.11 with the predict, watch and compare activity. The original app is unchanged</td></tr>
-      <tr><td>Prediction activity</td><td>0.1</td><td>Predict the towns reached by lava and ash, see a question at each stage, then compare your prediction with the model and the 1944 record. First version</td></tr>
+      <tr><td>App (lab)</td><td>VR lab 0.2</td><td>0.2: one reasoned prediction instead of picking towns; works in the headset. 0.1: test copy of Vesuvius VR 0.11 with the predict, watch and compare activity. The original app is unchanged</td></tr>
+      <tr><td>Prediction activity</td><td>0.2</td><td>0.2: one prediction with a reason: where will the lava from the north rim go (tap the model, point in the headset, or choose), and why; feedback on the reason; short comparison with the 1944 record. 0.1: predict towns for lava and ash, compare in tables</td></tr>
       <tr><td>1944 record</td><td>0.1</td><td>Towns destroyed by lava (San Sebastiano al Vesuvio, Massa di Somma) and towns named under the ash cloud by INGV. A mapped outline of the real 1944 flows is not included yet (licence not confirmed)</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
@@ -361,7 +362,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR lab 0.1";
+const VERSION = "VR lab 0.2";
 const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";   // lab page: test copy, see the original vesuvius-1944-vr.html
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
@@ -980,7 +981,7 @@ let scrubbing = false;
 $("scrub").oninput = () => { scrubbing = true; pb.sec = $("scrub").value / 1000 * PLAY_S; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } };
 $("scrub").onchange = () => { scrubbing = false; };
 $("play").onclick = () => {
-  if (act.step === "predict") { startWatch(false); return; }        // Play before predicting = just watch
+  if (act.step === "predict") { startWatch(canLock()); return; }    // Play locks in a complete prediction; otherwise just watch
   if (act.step === "compare") { startWatch(act.locked); return; }   // watch again, keeping the prediction
   if (pb.sec >= PLAY_S) restart(); else setPlaying(!pb.playing); };
 $("restart").onclick = () => { if (act.step !== "watch") { startWatch(act.step === "compare" && act.locked); return; } restart(); };
@@ -998,31 +999,76 @@ $("standTable").onclick = () => leaveWalk();
 $("ashBtn").onclick = () => setToggle("ash", !toggles.ash);
 $("names").onclick = () => setToggle("names", !toggles.names);
 $("recordBtn").onclick = () => setToggle("record", !toggles.record);
-// ---------------- Predict, watch, compare (lab 0.1) ----------------
-// 1944 record: towns destroyed by lava (INGV; archive moment 4), and towns INGV names under the ash cloud of 22-23 March.
-// Ash towns not named here may still have had ash; the compare table says "not named", not "no".
+// ---------------- Predict, watch, compare (lab 0.2) ----------------
+// One reasoned prediction: where will the lava from the north rim go, and why? (Predicting with a reason before
+// watching helps learning; passive watching does not: Crouch et al. 2004, Am. J. Phys. 72, 835.)
+// 1944 record: the northern flow was turned west by Monte Somma and destroyed San Sebastiano al Vesuvio and Massa di
+// Somma; it was 5.6 km long (INGV; Vilardo and Ventura 2008, Journal of Maps). Ash towns: INGV account of 22-23 March.
 const RECORD = { lava: ["San Sebastiano", "Massa di Somma"], ash: ["Terzigno", "Pompei", "Scafati", "Angri", "Nocera Inferiore", "Poggiomarino"] };
-const MODEL = { lava: new Set(), ash: new Set() };
+const MODEL = { lava: new Set() };
 const ARCH = window.VesuviusArchive && VesuviusArchive.data && VesuviusArchive.data.STORY ? VesuviusArchive.data.STORY : [];
-const act = { step: "predict", locked: false, lava: new Set(), ash: new Set(), moment: -1 };
+// directions as seen from the crater (compass bearings, degrees); the towns named are the ones in each direction on the model
+const DIRS = [
+  { id: "n", label: "North, over Monte Somma", from: 330, to: 30 },
+  { id: "e", label: "East (Terzigno)", from: 30, to: 120 },
+  { id: "s", label: "South (Boscotrecase, Pompei)", from: 120, to: 200 },
+  { id: "sw", label: "South-west (Ercolano, Torre del Greco)", from: 200, to: 285 },
+  { id: "w", label: "West (San Sebastiano, Massa di Somma)", from: 285, to: 330 },
+  { id: "c", label: "Stops close to the crater" }];
+const REASONS = [
+  { id: "near", label: "It's the nearest town", vr: "Nearest town" },
+  { id: "steep", label: "It's the steepest way downhill", vr: "Steepest way down" },
+  { id: "valley", label: "It follows a valley", vr: "Follows a valley" },
+  { id: "unsure", label: "I'm not sure", vr: "Not sure" }];
+const act = { step: "predict", locked: false, dir: null, why: null, point: null, moment: -1 };
 const townKm = (name) => { const t = TOWNS.find(t => t[0] === name), [x, y] = toXY(t[1], t[2]), [cx, cy] = toXY(CRATER.lon, CRATER.lat); return Math.hypot(x - cx, y - cy) / 1000; };
-for (const kind of ["lava", "ash"]) {
-  const box = $(kind === "lava" ? "pLava" : "pAsh");
-  for (const [name] of TOWNS) {
-    const b = document.createElement("button"); b.type = "button"; b.textContent = name; b.setAttribute("aria-pressed", "false");
-    b.onclick = () => { const set = act[kind]; if (set.has(name)) set.delete(name); else set.add(name); b.setAttribute("aria-pressed", String(set.has(name))); };
-    box.appendChild(b);
-  }
+const radios = (box, name, items, onPick) => items.forEach(it => {
+  const l = document.createElement("label"), i = document.createElement("input"); i.type = "radio"; i.name = name; i.value = it.id;
+  i.onchange = () => onPick(it.id, false); l.append(i, document.createTextNode(it.label)); $(box).appendChild(l); });
+radios("pDir", "pdir", DIRS, (id) => setDir(id, false));
+radios("pWhy", "pwhy", REASONS, (id) => setWhy(id));
+const canLock = () => !!(act.dir && act.why && lava.arr);
+function syncLock() { $("lockIn").disabled = !canLock(); panelDirty = true; }
+function setDir(id, fromTap) {
+  act.dir = id; if (!fromTap) { act.point = null; guessPin.visible = false; }
+  document.querySelectorAll('#pDir input').forEach(i => { i.checked = i.value === id; });
+  if (fromTap) announce("You chose: " + DIRS.find(d => d.id === id).label + ".");
+  syncLock();
 }
+function setWhy(id) { act.why = id; document.querySelectorAll('#pWhy input').forEach(i => { i.checked = i.value === id; }); syncLock(); }
+// tapping the model (or pointing in the headset) chooses a spot; the direction from the crater picks the option
+const guessPin = (() => { const cv = document.createElement("canvas"), cx = cv.getContext("2d"), text = "▼ Your guess"; cx.font = "700 40px system-ui, sans-serif";
+  const w = Math.ceil(cx.measureText(text).width) + 28; cv.width = w; cv.height = 60; cx.font = "700 40px system-ui, sans-serif";
+  cx.fillStyle = "rgba(25,90,160,0.95)"; cx.beginPath(); cx.roundRect(0, 2, w, 56, 12); cx.fill(); cx.fillStyle = "#fff"; cx.fillText(text, 14, 44);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true })); s.center.set(0.5, 0);
+  s.scale.set(0.016 * w / 60, 0.016, 1); s.renderOrder = 12; s.visible = false; table.add(s); return s; })();
+function pickRay(ray) {
+  if (act.step !== "predict" || !terrain) return false;
+  const hit = ray.intersectObjects(walk && patch ? [patch.ground, terrain] : [terrain], false)[0]; if (!hit) return false;
+  const p = table.worldToLocal(hit.point.clone()), x = p.x / SCALE, y = -p.z / SCALE, [cx, cy] = toXY(CRATER.lon, CRATER.lat);
+  const dist = Math.hypot(x - cx, y - cy), brg = (Math.atan2(x - cx, y - cy) * 180 / Math.PI + 360) % 360;
+  const d = dist < 1200 ? DIRS.find(d => d.id === "c") : DIRS.find(d => d.from !== undefined && (d.from < d.to ? brg >= d.from && brg < d.to : brg >= d.from || brg < d.to));
+  act.point = [x, y]; const a = new Float32Array(3); tpos(x, y, hAt(x, y) + 150, a, 0); guessPin.position.set(a[0], a[1], a[2]); guessPin.visible = !walk;
+  setDir(d.id, true); return true;
+}
+let tapDown = null;
+canvas.addEventListener("pointerdown", (e) => { tapDown = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+canvas.addEventListener("pointerup", (e) => {
+  const t = tapDown; tapDown = null; if (!t || renderer.xr.isPresenting || act.step !== "predict") return;
+  if (Math.hypot(e.clientX - t.x, e.clientY - t.y) > 6 || performance.now() - t.t > 600) return;   // a drag turns the model; only a tap picks
+  const r = canvas.getBoundingClientRect(), ndc = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  raycaster.setFromCamera(ndc, camera); pickRay(raycaster);
+});
 function setStep(step) {
   act.step = step; ["predict", "watch", "compare"].forEach((k, i) => { const li = $("st" + (i + 1)); if (k === step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current"); });
   $("actPredict").hidden = step !== "predict"; $("actWatch").hidden = step !== "watch"; $("actCompare").hidden = step !== "compare";
   panelDirty = true;
 }
-const list = (set) => set.size ? [...set].join(", ") : "none";
+const lc = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 function startWatch(locked) {
-  act.locked = locked; act.moment = -1; setStep("watch");
-  $("myPred").innerHTML = locked ? `<b>Your prediction.</b> Lava: ${list(act.lava)}. Ash: ${list(act.ash)}.` : "Watching without a prediction.";
+  act.locked = locked && canLock(); act.moment = -1; setStep("watch");
+  $("myPred").innerHTML = act.locked ? `<b>Your prediction:</b> ${DIRS.find(d => d.id === act.dir).label}, because ${lc(REASONS.find(r => r.id === act.why).label)}.` : "Watching without a prediction.";
   restart();
 }
 function actTick(h) {                                         // the question for the stage that is playing (from the shared 1944 archive)
@@ -1033,49 +1079,50 @@ function actTick(h) {                                         // the question fo
   const q = ARCH[i].q; $("actQ").innerHTML = `<b>Think about it:</b> ${q}`; panelQ = q; panelDirty = true;
   const el = $("announceQ"); el.textContent = ""; setTimeout(() => { el.textContent = "Think about it: " + q; }, 400);
 }
-function actReady() {                                         // once the model has run: which towns it reaches
-  for (const [name, lon, lat] of TOWNS) {
-    const [x, y] = toXY(lon, lat);
-    for (const c of lava.cells) { const [cx, cy] = cellXY(c); if (Math.hypot(cx - x, cy - y) < 700) { MODEL.lava.add(name); break; } }   // town labels are approximate: within 700 m
-    const AW = ashTex.image.width, AH = ashTex.image.height, d = ashTex.image.data;
-    const i = Math.min(AW - 1, Math.max(0, Math.floor((x - XMIN) / (XMAX - XMIN) * AW))), j = Math.min(AH - 1, Math.max(0, Math.floor((YMAX - y) / (YMAX - YMIN) * AH)));
-    if (d[(j * AW + i) * 4] >= 50 || d[(j * AW + i) * 4 + 1] >= 50) MODEL.ash.add(name);   // about 1/5 of the strongest ash fall
-  }
-  $("lockIn").disabled = $("skipPredict").disabled = false;
+function actReady() {                                         // once the model has run: which towns its lava reaches
+  for (const [name, lon, lat] of TOWNS) { const [x, y] = toXY(lon, lat);
+    for (const c of lava.cells) { const [cx, cy] = cellXY(c); if (Math.hypot(cx - x, cy - y) < 700) { MODEL.lava.add(name); break; } } }   // labels are approximate: within 700 m
+  $("skipPredict").disabled = false; syncLock();
 }
-$("lockIn").onclick = () => startWatch(true);
+$("lockIn").onclick = () => { if (canLock()) startWatch(true); };
 $("skipPredict").onclick = () => startWatch(false);
 function actEnded() { if (act.step === "watch") { pb.phase = 5; showCompare(); } }   // phase set first so the end-of-eruption text does not replace the comparison
+const FB_DIR = {
+  w: "Yes. The lava went west and destroyed San Sebastiano and Massa di Somma.",
+  n: "It did start north, but the wall of Monte Somma blocked it and turned it west, to San Sebastiano and Massa di Somma.",
+  c: "It kept going: the northern flow was 5.6 km long by the end, and reached San Sebastiano and Massa di Somma.",
+  other: "It went west instead, to San Sebastiano and Massa di Somma." };
+const FB_WHY = {
+  near: "Distance is not what decides where lava goes. Boscotrecase is about as far from the crater as San Sebastiano, and the lava never went there.",
+  steep: "Good reasoning: lava takes the steepest way downhill. When the northern flow met the wall of Monte Somma, the steepest way became west.",
+  valley: "Good reasoning: once Monte Somma turned the flow, it ran west along the valley between Monte Somma and the cone of Vesuvius.",
+  unsure: "Watch it again: what does the lava do when it reaches the wall of Monte Somma?" };
 function showCompare() {
   setStep("compare"); setToggle("record", true);
-  const Y = '<span aria-hidden="true">✓</span><span class="sr-only">yes</span>', N = '<span aria-hidden="true">–</span><span class="sr-only">no</span>',
-    NN = '<span aria-hidden="true">–</span><span class="sr-only">not named</span>';
-  const mkTable = (kind, cap, recNo) => {
-    const names = TOWNS.map(t => t[0]).filter(n => act[kind].has(n) || MODEL[kind].has(n) || RECORD[kind].includes(n));
-    const you = act.locked;
-    return `<table><caption>${cap}</caption><tr><th scope="col">Town</th>${you ? '<th scope="col">You</th>' : ""}<th scope="col">Model</th><th scope="col">1944</th></tr>` +
-      names.map(n => `<tr><th scope="row">${n}</th>${you ? `<td>${act[kind].has(n) ? Y : N}</td>` : ""}<td>${MODEL[kind].has(n) ? Y : N}</td><td>${RECORD[kind].includes(n) ? Y : recNo}</td></tr>`).join("") + "</table>";
-  };
-  const hit = RECORD.lava.filter(n => act.lava.has(n)).length, extra = [...act.lava].filter(n => !RECORD.lava.includes(n)).length;
-  const score = `you picked ${hit} of the ${RECORD.lava.length} towns the lava reached in 1944` + (extra ? `, and ${extra} town${extra > 1 ? "s" : ""} it did not reach` : "") + ".";
+  const fbDir = act.locked ? (FB_DIR[act.dir] || FB_DIR.other) : "The northern flow was turned west by the wall of Monte Somma and destroyed San Sebastiano and Massa di Somma.";
+  const fbWhy = act.locked ? FB_WHY[act.why] : "";
+  const ssXY = toXY(TOWNS[0][1], TOWNS[0][2]);
+  const spot = act.locked && act.point ? ` Your spot is ${(Math.hypot(act.point[0] - ssXY[0], act.point[1] - ssXY[1]) / 1000).toFixed(1)} km from San Sebastiano, where the lava stopped.` : "";
+  const modelLine = MODEL.lava.has("San Sebastiano") ? "The model's lava does the same." : "On the model the lava stops short of San Sebastiano.";
   const ss = townKm("San Sebastiano").toFixed(1), bt = townKm("Boscotrecase").toFixed(1);
   const lavaQ = `San Sebastiano (${ss} km from the crater) and Boscotrecase (${bt} km) are about the same distance away, but only San Sebastiano was reached. What made the difference?`;
-  const modelQ = "The ash on the model was drawn to follow the 1944 records, so it is bound to match. The lava was worked out by a computer model from the shape of the ground, today's ground, which already includes the 1944 lava and everything built since. How might that make the model different from what really happened?";
   $("actCompare").innerHTML =
-    (act.locked ? `<p><b>Lava:</b> ${score}</p>` : "") +
-    mkTable("lava", "Lava reached the town", N) + mkTable("ash", "Ash fell on the town", NN) +
-    `<p class="small">“1944: –” for ash means the town is not named in the INGV account. Ash may still have fallen there.</p>` +
+    `<p><b>What happened:</b> ${fbDir}${spot} ${modelLine}</p>` + (fbWhy ? `<p><b>Your reason:</b> ${fbWhy}</p>` : "") +
     `<p class="q"><b>Explain:</b> ${lavaQ}</p>` +
-    `<details><summary>Hint</summary><p>Turn the model to look at it from the north. Find Monte Somma, the old crater wall that curves around the north side of Vesuvius. What did it do to the northern flow?</p></details>` +
-    `<p class="q"><b>Model or record?</b> ${modelQ}</p>` +
-    `<details><summary>Notes for teachers</summary><p>Lava follows the steepest way downhill. The wall of Monte Somma turned the northern flow west, towards San Sebastiano and Massa di Somma, where it stopped about 140 m above sea level. The south-east flow stopped higher up the slope, at about 350 m. Ash went where the wind blew it: east on 22–23 March, then south-west. Most of the 26 deaths came from roofs collapsing under ash, not from the lava (shared 1944 archive; INGV).</p>${act.locked && $("pWhy").value.trim() ? `<p><b>The student wrote:</b> ${$("pWhy").value.trim().replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))}</p>` : ""}</details>` +
-    `<div class="row"><button id="watchAgain">Watch again</button><button id="tryAgain">Start a new prediction</button></div>`;
+    `<details><summary>Hint</summary><p>Turn the model to look at it from the north. Find Monte Somma, the old crater wall that curves around the north side of Vesuvius.</p></details>` +
+    `<details><summary>Model or record?</summary><p>The lava on the model was worked out by a computer from today's ground, which already includes the 1944 lava and everything built since. How might that make it different from what really happened?</p></details>` +
+    `<details><summary>Notes for teachers</summary><p>Lava follows the steepest way downhill. The wall of Monte Somma turned the northern flow west, towards San Sebastiano and Massa di Somma, where it stopped about 140 m above sea level; the flow was 5.6 km long. Students who choose “nearest town” are reasoning from distance; the San Sebastiano and Boscotrecase question puts that idea to the test. Most of the 26 deaths in 1944 came from roofs collapsing under ash, not from the lava (shared 1944 archive; INGV; Vilardo and Ventura 2008).</p></details>` +
+    `<div class="row"><button id="watchAgain">Watch again</button><button id="tryAgain">New prediction</button></div>`;
   $("watchAgain").onclick = () => startWatch(act.locked);
-  $("tryAgain").onclick = () => { act.lava.clear(); act.ash.clear(); document.querySelectorAll("#pLava button, #pAsh button").forEach(b => b.setAttribute("aria-pressed", "false")); $("pWhy").value = "";
-    setToggle("record", false); setPlaying(false); pb.sec = 0; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } panelQ = ""; setStep("predict"); say(PHASE_TEXT[0]); };
-  const short = (act.locked ? `Lava: ${score} ` : "") + "In 1944 lava destroyed San Sebastiano and Massa di Somma; the ash fell mostly to the east. The 1944 record is now shown on the model.";
-  say("<b>Compare.</b> " + short); panelQ = lavaQ; panelDirty = true;
+  $("tryAgain").onclick = newPrediction;
+  say("<b>What happened.</b> " + fbDir + (fbWhy ? " " + fbWhy : "")); panelQ = lavaQ; panelDirty = true;
 }
+function newPrediction() {
+  act.dir = act.why = act.point = null; guessPin.visible = false; document.querySelectorAll("#pDir input, #pWhy input").forEach(i => { i.checked = false; });
+  setToggle("record", false); setPlaying(false); pb.sec = 0; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; }
+  panelQ = ""; setStep("predict"); syncLock(); say(PHASE_TEXT[0]);
+}
+const PREDICT_VR = "Lava is pouring over the north rim of the crater. Point at the model and pull the trigger where you think it will stop, then choose why.";
 // 1944 record markers above the towns (table view), shown with the "1944 record" button and in the compare step
 const recordMarks = new THREE.Group(); recordMarks.visible = false; table.add(recordMarks);
 function buildRecordMarks() {
@@ -1199,6 +1246,8 @@ addBtn("timeline", "", 40, 290, 944, 70);
 addBtn("sound", "Sound", 40, 380, 300, 90); addBtn("ash", "Ash", 362, 380, 300, 90); addBtn("names", "Names", 684, 380, 300, 90);
 addBtn("smaller", "Smaller", 40, 490, 300, 90); addBtn("bigger", "Bigger", 362, 490, 300, 90); addBtn("rotate", "Turn", 684, 490, 300, 90);
 addBtn("reset", "Reset table", 40, 700, 460, 80); addBtn("record", "1944 record", 524, 700, 460, 80);
+REASONS.forEach((R, k) => BTN.push({ id: "why:" + R.id, label: R.vr, x: 40 + (k % 2) * 484, y: 1110 + Math.floor(k / 2) * 100, w: 460, h: 84, vis: () => act.step === "predict" }));
+BTN.push({ id: "lockin", label: "Lock in and watch", x: 40, y: 1320, w: 944, h: 90, vis: () => act.step === "predict" });
 addBtn("ss", "In San Sebastiano", 40, 600, 380, 80); addBtn("po", "In Pompei", 440, 600, 260, 80); addBtn("tbl", "Table", 720, 600, 264, 80);
 function drawPanel() {
   pctx.clearRect(0, 0, PW, PH);
@@ -1207,7 +1256,9 @@ function drawPanel() {
   pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; pctx.fillText(VERSION, PW - 40 - pctx.measureText(VERSION).width, 95);
   pctx.fillStyle = "#6b665c"; pctx.font = "600 24px system-ui, sans-serif"; pctx.fillText(CREDIT_TAG, PW - 40 - pctx.measureText(CREDIT_TAG).width, 130);   // credit tag, under the version
   for (let b = 0; b < BTN.length; b++) {
-    const B = BTN[b]; let label = B.label, on = true;
+    const B = BTN[b]; let label = B.label, on = true; if (B.vis && !B.vis()) continue;
+    const strong = B.id === "play" || (B.id.startsWith("why:") && act.why === B.id.slice(4)) || (B.id === "lockin" && canLock());
+    if (B.id === "lockin") on = canLock();
     if (B.id === "timeline") { pctx.fillStyle = "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
       pctx.fillStyle = "#b4381c"; roundRect(B.x, B.y, Math.max(40, B.w * pb.sec / PLAY_S), B.h, 20); pctx.fill();
       pctx.fillStyle = "#22201c"; pctx.font = "600 36px system-ui, sans-serif"; pctx.fillText(panelDate || "", B.x + 24, B.y + 48); continue; }
@@ -1216,12 +1267,15 @@ function drawPanel() {
     if (["smaller", "bigger", "rotate", "reset"].includes(B.id)) on = !walk;
     if (B.id === "tbl") on = !!walk;
     if (B.id === "ss" || B.id === "po") on = !walk || walk.id !== B.id;
-    pctx.fillStyle = B.id === "play" ? (b === hover ? "#9b2f16" : "#b4381c") : (b === hover ? "#e2d9c7" : "#efe9dd"); roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
-    pctx.globalAlpha = on ? 1 : 0.45; pctx.fillStyle = B.id === "play" ? "#fff" : "#22201c"; pctx.font = "600 44px system-ui, sans-serif";
+    pctx.fillStyle = strong ? (b === hover ? "#9b2f16" : "#b4381c") : (b === hover ? "#e2d9c7" : "#efe9dd"); roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+    pctx.globalAlpha = on ? 1 : 0.45; pctx.fillStyle = strong ? "#fff" : "#22201c"; pctx.font = "600 44px system-ui, sans-serif";
     pctx.fillText(label, B.x + 28, B.y + B.h / 2 + 15); pctx.globalAlpha = 1;
   }
-  pctx.fillStyle = "#22201c"; pctx.font = "36px system-ui, sans-serif"; wrap(panelInfo + (panelQ ? "   Think about it: " + panelQ : ""), 40, 850, PW - 80, 46);
-  if (panelMoment) {                                          // eyewitness account from the shared 1944 archive
+  if (act.step === "predict") {                              // the prediction, on the headset menu
+    pctx.fillStyle = "#22201c"; pctx.font = "34px system-ui, sans-serif"; const yq = wrap(PREDICT_VR, 40, 850, PW - 80, 42);
+    pctx.fillStyle = "#b4381c"; pctx.font = "600 32px system-ui, sans-serif"; wrap(act.dir ? "Your choice: " + DIRS.find(d => d.id === act.dir).label : "Your choice: not yet", 40, yq + 56, PW - 80, 40);
+  } else { pctx.fillStyle = "#22201c"; pctx.font = "36px system-ui, sans-serif"; wrap(panelInfo + (panelQ ? "   Think about it: " + panelQ : ""), 40, 850, PW - 80, 46); }
+  if (panelMoment && act.step !== "predict") {                                          // eyewitness account from the shared 1944 archive
     const y0 = 1390; pctx.fillStyle = "#efe9dd"; roundRect(24, y0 - 50, PW - 48, 330, 24); pctx.fill();
     pctx.fillStyle = "#b4381c"; pctx.font = "bold 28px system-ui, sans-serif"; pctx.fillText((panelMoment.who ? "EYEWITNESS · " : "PHOTOGRAPH · ") + panelMoment.when.toUpperCase(), 44, y0);
     pctx.fillStyle = "#22201c"; pctx.font = "italic 34px Georgia, serif"; const y1 = wrap(panelMoment.text, 44, y0 + 50, PW - 88, 42);
@@ -1250,6 +1304,8 @@ function pressButton(id, u) {
   else if (id === "restart") restart();
   else if (id === "timeline") { pb.sec = Math.max(0, Math.min(1, u)) * PLAY_S; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } }
   else if (id === "sound" || id === "ash" || id === "names" || id === "record") setToggle(id, !toggles[id]);
+  else if (id.startsWith("why:")) setWhy(id.slice(4));
+  else if (id === "lockin") { if (canLock()) startWatch(true); }
   else if (id === "ss" || id === "po") enterWalk(id);
   else if (id === "tbl") leaveWalk();
   else if (walk && ["smaller", "bigger", "rotate", "reset"].includes(id)) return;
@@ -1267,7 +1323,8 @@ const ctrls = [0, 1].map(i => {
   line.scale.z = 2; c.add(line);
   const grip = renderer.xr.getControllerGrip(i); grip.add(cmf.createControllerModel(grip)); scene.add(grip);
   const hand = renderer.xr.getHand(i); hand.add(hmf.createHandModel(hand, "spheres")); scene.add(hand);
-  c.addEventListener("select", () => { const h = hitButton(c); if (h) pressButton(BTN[h.b].id, h.u); });
+  c.addEventListener("select", () => { const h = hitButton(c); if (h) { pressButton(BTN[h.b].id, h.u); return; }
+    if (act.step === "predict") { tmpM.identity().extractRotation(c.matrixWorld); raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld); raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM); pickRay(raycaster); } });
   c.addEventListener("squeezestart", () => { if (walk) return; stand.visible = false; c.attach(table); c.userData.holding = true; });
   c.addEventListener("squeezeend", () => { if (!c.userData.holding) return; scene.attach(table); c.userData.holding = false; });
   return c;
@@ -1278,7 +1335,7 @@ function hitButton(c) {
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld); raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
   const hit = raycaster.intersectObject(panel)[0]; if (!hit || !hit.uv) return null;
   const x = hit.uv.x * PW, y = (1 - hit.uv.y) * PH;
-  const b = BTN.findIndex(B => x >= B.x && x <= B.x + B.w && y >= B.y && y <= B.y + B.h);
+  const b = BTN.findIndex(B => (!B.vis || B.vis()) && x >= B.x && x <= B.x + B.w && y >= B.y && y <= B.y + B.h);
   return b >= 0 ? { b, u: (x - BTN[b].x) / BTN[b].w } : null;
 }
 
