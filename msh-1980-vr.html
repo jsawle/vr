@@ -96,7 +96,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td class="app-ver">VR 0.11</td><td>0.11: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, scrolling panel on small screens and when zoomed), this versions table, and credit tag</td></tr>
+      <tr><td>App</td><td class="app-ver">VR 0.12</td><td>0.12: no © line in the credit box or on the headset menu. 0.11: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, scrolling panel on small screens and when zoomed), this versions table, and credit tag</td></tr>
       <tr><td>Hazard models</td><td>1.5</td><td>Energy cone (Malin and Sheridan 1982) for pyroclastic flows and the lateral blast; LAHARZ (Iverson and colleagues 1998; Griswold and Iverson 2008) for lahars and the debris avalanche</td></tr>
     </table>
   </details>
@@ -104,7 +104,7 @@
 <div id="xr"></div>
 </main>
 <footer id="creditBox">
-  <p id="madeby">Created by Jason Sawle · © Esri 2026</p>
+  <p id="madeby">Created by Jason Sawle</p>
   <p id="credits"></p>
 </footer>
 
@@ -405,8 +405,8 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.11";
-const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
+const VERSION = "VR 0.12";
+const CREDIT_TAG = "Created by Jason Sawle";
 document.title = "Mount St Helens 1980 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
 const HM = window.HazardModels;

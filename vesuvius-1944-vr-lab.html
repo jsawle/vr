@@ -44,6 +44,8 @@
     background: rgba(20,18,16,.82); border-radius: 6px; padding: 4px 8px; }
   #creditBox p { margin: 0; }
   #madeby { font-weight: 600; }
+  #creditBox #credits { margin-top: 3px; font-weight: 400; }
+  #srcBtn { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
   #xr { position: absolute; left: 50%; bottom: 52px; z-index: 2; transform: translateX(-50%); display: flex; gap: 10px; }
   #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
     background: var(--accent-btn) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
@@ -81,7 +83,7 @@
   #act details { color: var(--ink); }
   #act .small { font-size: 11.5px; color: var(--muted); }
 </style>
-<!-- 1944 newsreels, photos and eyewitness accounts: shared with the Vesuvius pages in jsawle/curriculum_artifacts -->
+<!-- 1944 photos and eyewitness accounts: shared with the Vesuvius pages in jsawle/curriculum_artifacts -->
 <script src="https://jsawle.github.io/curriculum_artifacts/vesuvius-1944-archive.js"></script>
 </head>
 <body>
@@ -140,7 +142,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App (lab)</td><td>VR lab 0.2</td><td>0.2: one reasoned prediction instead of picking towns; works in the headset. 0.1: test copy of Vesuvius VR 0.11 with the predict, watch and compare activity. The original app is unchanged</td></tr>
+      <tr><td>App (lab)</td><td>VR lab 0.3</td><td>0.3: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.2: one reasoned prediction instead of picking towns; works in the headset. 0.1: test copy of Vesuvius VR 0.11 with the predict, watch and compare activity. The original app is unchanged</td></tr>
       <tr><td>Prediction activity</td><td>0.2</td><td>0.2: one prediction with a reason: where will the lava from the north rim go (tap the model, point in the headset, or choose), and why; feedback on the reason; short comparison with the 1944 record. 0.1: predict towns for lava and ash, compare in tables</td></tr>
       <tr><td>1944 record</td><td>0.1</td><td>Towns destroyed by lava (San Sebastiano al Vesuvio, Massa di Somma) and towns named under the ash cloud by INGV. A mapped outline of the real 1944 flows is not included yet (licence not confirmed)</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
@@ -150,9 +152,13 @@
 <div id="xr"></div>
 </main>
 <footer id="creditBox">
-  <p id="madeby">Created by Jason Sawle · © Esri 2026</p>
-  <p id="credits"></p>
+  <p id="madeby">Created by Jason Sawle · Powered by Esri · <button id="srcBtn" type="button" aria-expanded="false" aria-controls="credits">Sources</button></p>
+  <p id="credits" hidden></p>
 </footer>
+<script>
+  // one line of credits; the full list opens on demand (Esri's own maps do the same)
+  document.getElementById("srcBtn").onclick = function () { const c = document.getElementById("credits"), open = c.hidden; c.hidden = !open; this.setAttribute("aria-expanded", String(open)); };
+</script>
 
 <script>
 /* Lava flow model — DOWNFLOW-style probabilistic steepest descent.
@@ -362,8 +368,8 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR lab 0.2";
-const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
+const VERSION = "VR lab 0.3";
+const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";   // lab page: test copy, see the original vesuvius-1944-vr.html
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
 const LM = window.LavaModel;
@@ -1282,6 +1288,7 @@ function drawPanel() {
     if (panelMoment.who) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelMoment.who, 44, y1 + 44, PW - 88, 34); }
   }
   pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
+  pctx.fillStyle = "#6b665c"; pctx.font = "26px system-ui, sans-serif"; pctx.fillText(`On the table heights are ×${EXAG}; standing in a town they are true height.`, 40, PH - 72);
   panelTex.needsUpdate = true; panelDirty = false;
 }
 function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
@@ -1376,7 +1383,10 @@ renderer.setAnimationLoop(() => {
     ftnP = makeParticles(900, FTN_FRAG, THREE.AdditiveBlending); ftnP.mesh.renderOrder = 7;
     localP = makeParticles(1500, ASH_FRAG, THREE.NormalBlending); localP.mesh.renderOrder = 8;
     glow = new THREE.PointLight(0xff6a1a, 0, 0.35, 1.5); { const p = new Float32Array(3); tpos(cx, cy, top + 300, p, 0); glow.position.set(p[0], p[1], p[2]); } table.add(glow);
-    $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Imagery: Esri World Imagery. Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Heights ×${EXAG} on the table, true height when standing in a town. ${VERSION}`;
+    // full credits behind "Sources": the attribution text each service publishes (copyrightText), checked October 2026
+    const ESRI_ELEV = "Esri World Elevation. Sources: Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, GEBCO, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen and the GIS User Community";
+    const TERRAIN_TILES = "Terrain Tiles (Mapzen, on AWS): produced using Copernicus data and information funded by the European Union, EU-DEM layers; SRTM and GMTED2010 data courtesy of the U.S. Geological Survey";
+    $("credits").textContent = `Elevation: ${{ esri: ESRI_ELEV, terrarium: TERRAIN_TILES, mixed: ESRI_ELEV + ". " + TERRAIN_TILES }[el.source]}. Imagery: Esri World Imagery. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Photographs: Melvin C. Shaffer, DeGolyer Library, Southern Methodist University (no known copyright restrictions); US Army Air Forces (public domain). Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Code: three.js (MIT licence), LERC (Apache 2.0). ${VERSION}`;
     for (const id of ["play", "restart", "scrub", "standSS", "standPO"]) $(id).disabled = false;
     panelDate = fmtDate(T.start); $("date").textContent = panelDate; $("scrub").setAttribute("aria-valuetext", panelDate); pb.sec = 0;
     say("The model is ready. " + PHASE_TEXT[0]); pb.phase = 0;

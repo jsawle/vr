@@ -45,6 +45,8 @@
     background: rgba(20,18,16,.82); border-radius: 6px; padding: 4px 8px; }
   #creditBox p { margin: 0; }
   #madeby { font-weight: 600; }
+  #creditBox #credits { margin-top: 3px; font-weight: 400; }
+  #srcBtn { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
   #xr { position: absolute; left: 50%; bottom: 52px; z-index: 2; transform: translateX(-50%); display: flex; gap: 10px; }
   #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
     background: var(--accent-btn) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
@@ -71,7 +73,7 @@
   #ui table.vers { border-collapse: collapse; width: 100%; font-size: 12px; }
   #ui table.vers td, #ui table.vers th { text-align: left; padding: 3px 4px; border-top: 1px solid var(--rule); vertical-align: top; }
 </style>
-<!-- 1944 newsreels, photos and eyewitness accounts: shared with the Vesuvius pages in jsawle/curriculum_artifacts -->
+<!-- 1944 photos and eyewitness accounts: shared with the Vesuvius pages in jsawle/curriculum_artifacts -->
 <script src="https://jsawle.github.io/curriculum_artifacts/vesuvius-1944-archive.js"></script>
 </head>
 <body>
@@ -99,7 +101,7 @@
   <div id="info">Loading the volcano…</div>
   <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <details class="va-sec">
-    <summary>Photos, newsreels and eyewitnesses <span class="ver va-ver">archive</span></summary>
+    <summary>Photos and eyewitnesses <span class="ver va-ver">archive</span></summary>
     <div id="vaPanel"></div>
   </details>
   <details>
@@ -107,7 +109,7 @@
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
     <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colors show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
     <p><b>The eruption column</b> follows INGV's account: lava fountains throwing material up to about 4 km (21–22 March), then explosions with a column more than 5 km high (22–23 March). Studies estimate about 10 km at its peak. The wind carried ash 15–20 km east. Smaller explosions, under 2 km high, blew ash to the south-west until 29 March. The particles, fountain height and the shape of the gray ash on the ground are illustrations that follow those directions and distances.</p>
-    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. You start at eye level in the town and can move anywhere, as on the table. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, which is an estimate. Time runs at the same pace as the rest of the story, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
+    <p><b>Standing in a town</b> shows the same model at real size, with heights not exaggerated. You start at eye level in the town and can move anywhere, as on the table. Go more than about 2 km up and the daylight sky fades to the dark table background. Close to you the ground is drawn in 10 m steps with sharper satellite images, but the elevation data is about 30 m, so small bumps and buildings are missing. The lava is drawn 5 m thick, which is an estimate. Time runs at the same pace as the rest of the story, so the lava front moves much faster than it really did. The falling ash is an illustration.</p>
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)<span class="sr-only"> (opens in a new tab, PDF)</span></a></p>
   </details>
@@ -116,7 +118,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR story 0.6</td><td>0.6: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.5: standing in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>App</td><td>VR story 0.9</td><td>0.9: “Photos and eyewitnesses” (the newsreels were removed from the shared archive, version 1.7, as both need a paid licence). 0.8: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.7: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.6: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.5: standing in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
       <tr><td>Lava model</td><td>1.0</td><td>DOWNFLOW-style steepest descent with hollow filling (same code as the lava explorer), run for the two 1944 flows; lava drawn where at least 1 in 5 flows went</td></tr>
       <tr><td>Lava look and timing</td><td>0.1</td><td>Cools from yellow-hot to a dark crust; one speed, timed so the northern flow reaches San Sebastiano early on 21 March. First numbered version</td></tr>
       <tr><td>Ash cloud and fountains</td><td>0.2</td><td>Illustration: eight fountains up to about 4 km, an ash column over 5 km blown east, then bursts under 2 km blown south-west. 0.2: those bursts lowered from 3 km (INGV)</td></tr>
@@ -129,9 +131,13 @@
 <div id="xr"></div>
 </main>
 <footer id="creditBox">
-  <p id="madeby">Created by Jason Sawle · © Esri 2026</p>
-  <p id="credits"></p>
+  <p id="madeby">Created by Jason Sawle · Powered by Esri · <button id="srcBtn" type="button" aria-expanded="false" aria-controls="credits">Sources</button></p>
+  <p id="credits" hidden></p>
 </footer>
+<script>
+  // one line of credits; the full list opens on demand (Esri's own maps do the same)
+  document.getElementById("srcBtn").onclick = function () { const c = document.getElementById("credits"), open = c.hidden; c.hidden = !open; this.setAttribute("aria-expanded", String(open)); };
+</script>
 
 <script>
 /* Lava flow model — DOWNFLOW-style probabilistic steepest descent.
@@ -341,8 +347,8 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR story 0.6";
-const CREDIT_TAG = "Created by Jason Sawle · © Esri 2026";
+const VERSION = "VR story 0.9";
+const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
 const VERSIONS = { app: VERSION, lava: "1.0", lavaLook: "0.1", cloud: "0.2", ground: "0.1", sound: "0.1", archive: window.VesuviusArchive ? VesuviusArchive.version : "missing" };
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.replace("VR ", "")}</div>`);
@@ -817,8 +823,10 @@ function ashFallAt(x, y, st) {
 function stepWalk(dt, st) {
   const fall = toggles.ash ? ashFallAt(walk.x, walk.y, st) : 0;
   skyAsh += (fall - skyAsh) * Math.min(1, dt * 0.5);
-  _sky.copy(SKY).lerp(ASHSKY, Math.min(1, skyAsh * 1.3)); scene.background = _sky.clone();
-  if (scene.fog) { scene.fog.color.copy(_sky); scene.fog.near = 4000 - 3700 * skyAsh; scene.fog.far = 45000 - 39000 * skyAsh; }
+  // flown well up and away from the ground: fade from daylight to the table's dark background and lift the haze (1.5-2.5 km up)
+  const hUp = renderer.xr.isPresenting ? 0 : heightAboveGround(), up = Math.min(1, Math.max(0, (hUp - 1500) / 1000)), upS = up * up * (3 - 2 * up);
+  _sky.copy(SKY).lerp(ASHSKY, Math.min(1, skyAsh * 1.3)).lerp(bg, upS); scene.background = _sky.clone();
+  if (scene.fog) { scene.fog.color.copy(_sky); scene.fog.near = 4000 - 3700 * skyAsh + upS * 200000; scene.fog.far = 45000 - 39000 * skyAsh + upS * 400000; }
   if (!pb.playing) return;
   const p = localP, wb = st.windB * Math.PI / 180;
   p.acc = (p.acc || 0) + fall * 90 * dt;
@@ -1035,10 +1043,16 @@ function townView() {
   const dx = craterXYZ[0] - walk.x, dy = craterXYZ[1] - walk.y, L = Math.hypot(dx, dy) || 1, tx = walk.x + dx / L * 800, ty = walk.y + dy / L * 800;
   camera.position.copy(worldOf(walk.x, walk.y, walk.g + 1.7)); controls.target.copy(worldOf(tx, ty, hBil(tx, ty))); controls.update();
 }
+function heightAboveGround() {                               // metres between the camera and the ground below it
+  _cp.copy(camera.position); table.worldToLocal(_cp);
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, z = _cp.y / (SCALE * exag) + HBASE;
+  return z - (x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX ? hBil(x, y) : 0);
+}
 function keepAboveGround() {
   _cp.copy(camera.position); table.worldToLocal(_cp);
-  const x = _cp.x / SCALE, y = -_cp.z / SCALE; if (x < XMIN || x > XMAX || y < YMIN || y > YMAX) return;
-  const minY = (hBil(x, y) + 2 - HBASE) * SCALE * exag; if (_cp.y >= minY) return;
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, inside = x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX;
+  // beyond the model's edges, sea level counts as the ground (0.11: it used to let you sink below)
+  const minY = ((inside ? hBil(x, y) : 0) + 2 - HBASE) * SCALE * exag; if (_cp.y >= minY) return;
   _cp.y = minY; table.localToWorld(_cp); camera.position.y = _cp.y;   // lift only the camera (moving the target too made it creep upwards)
 }
 function zoomBy(f) {
@@ -1138,8 +1152,9 @@ function drawPanel() {
     pctx.fillStyle = "#b4381c"; pctx.font = "bold 30px system-ui, sans-serif"; y = wrap("Think about it: " + S.question, 40, y, PW - 80, 40) + 46;
     if (S.hint && !walk) { pctx.fillStyle = "#6b665c"; pctx.font = "italic 28px system-ui, sans-serif"; y = wrap(S.hint, 40, y, PW - 80, 36) + 40; }
   }
-  if (panelInfo) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelInfo, 40, Math.min(y, PH - 110), PW - 80, 34); }
+  if (panelInfo) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelInfo, 40, Math.min(y, PH - 150), PW - 80, 34); }   // PH - 150 leaves room for the height note above the hint
   pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
+  pctx.fillStyle = "#6b665c"; pctx.font = "26px system-ui, sans-serif"; pctx.fillText(`On the table heights are ×${EXAG}; standing in a town they are true height.`, 40, PH - 72);
   panelTex.needsUpdate = true; panelDirty = false;
 }
 function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
@@ -1232,7 +1247,10 @@ renderer.setAnimationLoop(() => {
     ftnP = makeParticles(900, FTN_FRAG, THREE.AdditiveBlending); ftnP.mesh.renderOrder = 7;
     localP = makeParticles(1500, ASH_FRAG, THREE.NormalBlending); localP.mesh.renderOrder = 8;
     glow = new THREE.PointLight(0xff6a1a, 0, 0.35, 1.5); { const p = new Float32Array(3); tpos(cx, cy, top + 300, p, 0); glow.position.set(p[0], p[1], p[2]); } table.add(glow);
-    $("credits").textContent = `Elevation: ${{ esri: "Esri World Elevation", terrarium: "Mapzen/AWS Terrain Tiles", mixed: "Esri World Elevation and Mapzen/AWS Terrain Tiles" }[el.source]}. Imagery: Esri World Imagery. Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Heights ×${EXAG} on the table, true height when standing in a town. ${VERSION}`;
+    // full credits behind "Sources": the attribution text each service publishes (copyrightText), checked October 2026
+    const ESRI_ELEV = "Esri World Elevation. Sources: Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, GEBCO, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen and the GIS User Community";
+    const TERRAIN_TILES = "Terrain Tiles (Mapzen, on AWS): produced using Copernicus data and information funded by the European Union, EU-DEM layers; SRTM and GMTED2010 data courtesy of the U.S. Geological Survey";
+    $("credits").textContent = `Elevation: ${{ esri: ESRI_ELEV, terrarium: TERRAIN_TILES, mixed: ESRI_ELEV + ". " + TERRAIN_TILES }[el.source]}. Imagery: Esri World Imagery. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Photographs: Melvin C. Shaffer, DeGolyer Library, Southern Methodist University (no known copyright restrictions); US Army Air Forces (public domain). Lava: DOWNFLOW method (Favalli et al. 2005). 1944 events: INGV Osservatorio Vesuviano. Code: three.js (MIT licence), LERC (Apache 2.0). ${VERSION}`;
     for (const id of ["standSS", "standPO"]) $(id).disabled = false;
     panelDate = fmtDate(T.start); $("date").textContent = panelDate; pb.sec = 0; pb.phase = 0; info("");
     if (MOMENTS.length) { setMomentInfo(0); story.mode = "intro"; $("play").classList.add("pulse"); syncPlay(); }
