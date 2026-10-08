@@ -1,11 +1,9 @@
 name: Pompeii 79 - town footprints from OpenStreetMap
 
+# Run by hand only (Actions tab): OpenStreetMap changes over time and Overpass is sometimes down,
+# so the town data is only refreshed on purpose.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "pompeii79/town/fetch_osm_pompeii.py"
-      - ".github/workflows/pompeii79-town.yml"
 
 permissions:
   contents: write
@@ -24,8 +22,7 @@ jobs:
         run: |
           set -o pipefail
           python pompeii79/town/fetch_osm_pompeii.py pompeii79/town/pompeii_osm_utm33.json 2>&1 | tee pompeii79/town/fetch_log.txt
-      - name: Commit
-        if: always()
+      - name: Commit (only when the fetch worked)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
