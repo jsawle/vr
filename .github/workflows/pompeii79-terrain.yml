@@ -33,12 +33,17 @@ jobs:
           ls -l dem
 
       - name: Build the pre-79 model
+        shell: bash
         run: |
+          mkdir -p pompeii79/terrain/output
+          set -o pipefail
           python pompeii79/terrain/pre79_vesuvius.py \
             dem/Copernicus_DSM_COG_10_N40_00_E014_00_DEM.tif pompeii79/terrain/output \
-            --source "Copernicus GLO-30 (30 m), (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA"
+            --source "Copernicus GLO-30 (30 m), (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA" \
+            2>&1 | tee pompeii79/terrain/output/build_log.txt
 
-      - name: Commit outputs
+      - name: Commit outputs (and the log, even if the build failed)
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
