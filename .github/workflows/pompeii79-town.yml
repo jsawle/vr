@@ -1,0 +1,34 @@
+name: Pompeii 79 - town footprints from OpenStreetMap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "pompeii79/town/fetch_osm_pompeii.py"
+      - ".github/workflows/pompeii79-town.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyproj shapely
+      - name: Fetch from Overpass
+        shell: bash
+        run: |
+          set -o pipefail
+          python pompeii79/town/fetch_osm_pompeii.py pompeii79/town/pompeii_osm_utm33.json 2>&1 | tee pompeii79/town/fetch_log.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add pompeii79/town
+          git diff --cached --quiet || git commit -m "Pompeii 79: OSM town footprints [skip ci]"
+          git push
