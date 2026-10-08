@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<title>Pompeii AD 79 in VR</title>
+<meta name="description" content="Tabletop 3D and VR reconstruction of the AD 79 eruption of Vesuvius as it reached Pompeii: the volcano as it was before the eruption, the town and its people, the eruption column, the pumice fall and the pyroclastic currents. Works in a browser and on Meta Quest." />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+} }
+</script>
+<style>
+  /* --accent is for text and lines; --accent-btn is the fill behind white button text */
+  :root { --panel: rgba(255,253,248,.94); --ink: #22201c; --muted: #6b665c; --rule: #ddd6c8; --accent: #b4381c; --accent-btn: #b4381c; --chip: #efe9dd; --focus: #b4381c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #f07a55; --chip: #2b2823; --focus: #ffb59c; } }
+  :root[data-theme="dark"] { --panel: rgba(31,29,26,.92); --ink: #ece8df; --muted: #a39c8e; --rule: #3a3630; --accent: #f07a55; --chip: #2b2823; --focus: #ffb59c; }
+  html, body { margin: 0; height: 100%; background: #1c1b19; color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  canvas#three { display: block; width: 100%; height: 100%; touch-action: none; }
+  #ui { position: absolute; left: 12px; top: 12px; width: 320px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.3); z-index: 3; }
+  #ui h1 { font-size: 17px; margin: 0 0 2px; }
+  #ui .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  .row > * { flex: 1; }
+  button { font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 8px; padding: 8px 10px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); }
+  button.primary { background: var(--accent-btn); color: #fff; border-color: transparent; }
+  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+  button[aria-pressed="true"]::before { content: "✓ " / ""; }
+  button[aria-pressed="false"] { background: transparent; border-style: dashed; }
+  button:disabled { opacity: .45; cursor: default; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  canvas#three:focus-visible { outline-offset: -4px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  #date { font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  #info { margin-top: 4px; font-size: 13.5px; min-height: 1.4em; }
+  details { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  details summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+  details a { color: inherit; }
+  #creditBox { position: absolute; right: 8px; bottom: 6px; max-width: 60%; text-align: right; font-size: 11px; line-height: 1.35; color: #ece8df;
+    background: rgba(20,18,16,.82); border-radius: 6px; padding: 4px 8px; z-index: 3; }
+  #creditBox p { margin: 0; }
+  #madeby { font-weight: 600; }
+  #creditBox #credits { margin-top: 3px; font-weight: 400; }
+  #srcBtn { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+  #xr { position: absolute; left: 50%; bottom: 52px; z-index: 2; transform: translateX(-50%); display: flex; gap: 10px; }
+  #xr button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important;
+    background: var(--accent-btn) !important; color: #fff !important; border: 0 !important; border-radius: 10px !important; padding: 12px 18px !important; font: 600 15px system-ui, sans-serif !important; opacity: 1 !important; }
+  #xr button[disabled], #xr a { display: none; }
+  /* the agreed ending: the view fades as the current reaches you (no bodies are shown) */
+  #fade { position: absolute; inset: 0; background: #1a1714; opacity: 0; pointer-events: none; z-index: 1; transition: opacity .2s linear; }
+  @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #creditBox { max-width: calc(100% - 16px); } }
+  @media (forced-colors: active) { #creditBox { border: 1px solid CanvasText; } }
+  #ui .mwhen { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-top: 6px; }
+  #ui .mtitle { font-size: 18px; font-weight: 700; margin: 2px 0 4px; }
+  #ui .mtext { font-size: 13.5px; }
+  #ui #next.pulse, #ui #back.pulse, #ui #play.pulse { animation: pulse 1.6s ease-in-out 3; }   /* three pulses, then still (WCAG 2.2.2) */
+  @keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(180,56,28,.35); } }
+  @media (prefers-reduced-motion: reduce) { #ui .pulse { animation: none !important; } #fade { transition: none; } }
+  #ui table.vers { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #ui table.vers td, #ui table.vers th { text-align: left; padding: 3px 4px; border-top: 1px solid var(--rule); vertical-align: top; }
+</style>
+</head>
+<body>
+<main>
+<canvas id="three" tabindex="0" role="application" aria-roledescription="3D model" aria-label="3D model of Vesuvius, Pompeii and the Bay of Naples in AD 79" aria-describedby="modelDesc keysHelp"></canvas>
+<div id="fade" aria-hidden="true"></div>
+<p id="modelDesc" class="sr-only">A 3D reconstruction of Vesuvius before the AD 79 eruption, a broad flat-topped mountain without today's cone, with the walled town of Pompeii about 10 km to the south-east, Herculaneum on the coast to the west and Stabiae to the south. As the story plays, an eruption column rises from the mountain, pumice falls on the land to the south-east and covers Pompeii, and later ground-hugging currents of hot ash flow down the slopes. The panel describes each moment in words.</p>
+<div id="ui" role="region" aria-labelledby="appTitle">
+  <h1 id="appTitle">Pompeii, AD 79</h1>
+  <div class="sub" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest, press "Enter VR".</div>
+  <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
+  <div id="mWhen" class="mwhen"></div>
+  <div id="mTitle" class="mtitle">Loading…</div>
+  <div id="mText" class="mtext"></div>
+  <div class="row"><button id="play" class="primary" disabled><span aria-hidden="true">▶ </span>Watch the eruption</button></div>
+  <div class="row"><button id="back" disabled><span aria-hidden="true">◀ </span>Back</button><button id="next" disabled>Next<span aria-hidden="true"> ▶</span></button></div>
+  <div class="row"><button id="watchAll" hidden><span aria-hidden="true">↺ </span>Watch the whole eruption again</button></div>
+  <div class="row"><button id="standF" aria-pressed="false" disabled>Stand in the Forum</button><button id="standA" aria-pressed="false" disabled>Stand on Via dell'Abbondanza</button></div>
+  <div class="row"><button id="standTable" disabled>Back to the table</button></div>
+  <div class="row" role="group" aria-label="Show or hide"><button id="sound" aria-pressed="false">Sound</button><button id="ashBtn" aria-pressed="true">Eruption cloud</button><button id="names" aria-pressed="true">Names</button></div>
+  <div id="date"></div>
+  <div id="info">Loading…</div>
+  <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <details>
+    <summary>How this works</summary>
+    <p><b>The volcano before the eruption.</b> Today's cone (the Gran Cono, 1,281 m) grew after AD 79; its top was blown off in 1631 and rebuilt by eruptions up to 1944. Research finds no sign that a cone was built in the thousands of years before AD 79, though the shape of the summit before the eruption is still debated, and the geographer Strabo, writing before the eruption, described a mostly flat, barren, ash-coloured summit. So the model removes the cone and shows a broad, flat-topped Monte Somma with an old crater (caldera). The height of the caldera rim on the south side is not known; the model joins it up at about 990 m. It is a reconstruction, not a measurement (terrain model 0.1).</p>
+    <p><b>The town.</b> The city wall, the ancient streets and the public buildings around the Forum, the Palestra Grande and the amphitheatre are placed from OpenStreetMap. Most houses are not mapped, so the houses are generated: plots along each block, one or two storeys, with gardens in the middle, as Roman houses had. Each house is an illustration, not the real house on that spot. The theatres and many other buildings are not in this version.</p>
+    <p><b>The people</b> are simple figures walking the real streets. As the agreed approach for this case study, the app does not show anyone dying: people shelter or leave, and the view fades when the current arrives.</p>
+    <p><b>The eruption</b> follows published research. Times are approximate and the date is debated (24 August in Pliny's letters, or October). The column reaches about 27 km, then about 33 km. The pumice fall is a simple model that matches the measured thickness: up to about 2.8 m at Pompeii and about 2 m at Stabiae, falling mainly to the south-east at a steady rate. Roofs fail at random between about 0.3 and 1 m of pumice, following studies of the ruins; which roof fails when is an illustration. The currents spread from the volcano at the times recorded; their speed in the app is not their real speed.</p>
+    <p><b>Not shown in this version:</b> the AD 79 coastline (the sea then came about 1 km closer to Pompeii than it does today), the old course of the river Sarno, and the ground level of the plain, which was a few metres lower than today in places.</p>
+    <p>Sources: <a href="https://www.earth-prints.org/bitstream/2122/15020/1/Di%20Vito%2c%20M.%20A.%20%282021.pdf" target="_blank" rel="noopener">Di Vito 2021, INGV<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Strabo/5D*.html" target="_blank" rel="noopener">Strabo, Geography 5.4.8<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://se.copernicus.org/articles/12/119/2021/se-12-119-2021.pdf" target="_blank" rel="noopener">Tadini et al. 2021<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://digitalcommons.uri.edu/gsofacpubs/1114" target="_blank" rel="noopener">Sigurdsson et al. 1985<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://pages.mtu.edu/~raman/papers2/Luongo2JVGR.pdf" target="_blank" rel="noopener">Luongo et al. 2003<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://nora.nerc.ac.uk/id/eprint/529898/1/s41598-021-84456-7.pdf" target="_blank" rel="noopener">Dellino et al. 2021<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://pompeiisites.org/wp-content/uploads/27_E-Journal_La-data-della-distruzione-di-Pompei.pdf" target="_blank" rel="noopener">Parco Archeologico di Pompei: the date<span class="sr-only"> (opens in a new tab)</span></a></p>
+  </details>
+  <details>
+    <summary>Versions</summary>
+    <table class="vers">
+      <caption class="sr-only">Version numbers of the app and its parts</caption>
+      <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
+      <tr><td>App</td><td>1.0</td><td>First version: eight moments from an ordinary morning to the current reaching Pompeii, then today; table and life-size views; VR</td></tr>
+      <tr><td>Terrain before AD 79</td><td>0.1</td><td>Gran Cono removed, flat caldera floor, Monte Somma rim closed to the south (Copernicus GLO-30, 30 m)</td></tr>
+      <tr><td>Town</td><td>0.1</td><td>Wall, streets and public buildings from OpenStreetMap; houses generated</td></tr>
+      <tr><td>People</td><td>0.1</td><td>Simple figures walking the streets; they stop to look, then shelter or leave</td></tr>
+      <tr><td>Eruption column</td><td>0.1</td><td>About 27 km, then about 33 km; umbrella cloud blown south-east</td></tr>
+      <tr><td>Pumice fall</td><td>0.1</td><td>Thickness 4.5 m × e^(−distance / 20 km), narrowing away from the south-east axis; 2.8 m at Pompeii, 2 m at Stabiae; builds up at a steady rate (about 16 cm an hour at Pompeii); white then grey pumice</td></tr>
+      <tr><td>Roofs</td><td>0.1</td><td>Each roof fails at a random depth between 0.3 and 1 m of pumice (Luongo et al. 2003); which roof fails when is an illustration</td></tr>
+      <tr><td>Currents</td><td>0.1</td><td>Herculaneum about 01:00, Pompeii about 07:00 on day 2; not blown north past Monte Somma</td></tr>
+      <tr><td>Sound</td><td>0.1</td><td>Made in the browser, no recordings. Off until you turn it on</td></tr>
+    </table>
+  </details>
+</div>
+<div id="xr"></div>
+</main>
+<footer id="creditBox">
+  <p id="madeby">Created by Jason Sawle · Powered by Esri · <button id="srcBtn" type="button" aria-expanded="false" aria-controls="credits">Sources</button></p>
+  <p id="credits" hidden></p>
+</footer>
+<script>
+  document.getElementById("srcBtn").onclick = function () { const c = document.getElementById("credits"), open = c.hidden; c.hidden = !open; this.setAttribute("aria-expanded", String(open)); };
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { ARButton } from "three/addons/webxr/ARButton.js";
+import { VRButton } from "three/addons/webxr/VRButton.js";
+import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
+
+const VERSION = "1.0";
+const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
+const VERSIONS = { app: VERSION, terrain: "0.1", town: "0.1", people: "0.1", column: "0.1", fall: "0.1", roofs: "0.1", currents: "0.1", sound: "0.1" };
+document.title = "Pompeii AD 79 in VR (" + VERSION + ")";
+document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub" style="margin:-4px 0 6px">Version ${VERSION} · late summer or autumn AD 79</div>`);
+const $ = (id) => document.getElementById(id);
+let panelDirty = true, panelInfo = "", panelDate = "", panelStory = null;
+const info = (html) => { $("info").innerHTML = html; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); panelDirty = true; };
+let lastSaid = "";
+const announce = (html) => { const t = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); if (!t || t === lastSaid) return; lastSaid = t;
+  const el = $("announce"); el.textContent = ""; setTimeout(() => { el.textContent = t; }, 50); };
+const say = (html) => { info(html); announce(html); };
+
+// ---------------- Data ----------------
+const DATA = {
+  meta: "pompeii79/terrain/output/vesuvius_pre79_app_terrarium.json",
+  h79: "pompeii79/terrain/output/vesuvius_pre79_app_terrarium.png",
+  hNow: "pompeii79/terrain/output/vesuvius_today_app_terrarium.png",
+  town: "pompeii79/town/pompeii_town_v0_1.json"
+};
+// UTM 33N (metres). Local coordinates: x east, y north from the centre of the grid; Three.js z = -y.
+const VENT_UTM = [451861.7, 4519196.8];   // the Gran Cono summit, found by the terrain model; the AD 79 vent lay in the caldera here
+const PLACES = [["Pompeii", 456694, 4511187], ["Herculaneum", 444988, 4517426], ["Oplontis", 453802, 4511926], ["Stabiae", 457031, 4505346]];   // approximate
+let W, H, CELL, E0, N0, XMIN, XMAX, YMIN, YMAX;
+const toLocal = (E, N) => [E - E0, N - N0];
+
+// UTM zone 33N -> lon/lat (WGS84), for draping today's imagery
+function utmToLL(E, N) {
+  const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2), lon0 = 15 * Math.PI / 180;
+  const x = E - 500000, M = N / k0, mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 ** 3 / 256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const p1 = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) + (21 * e1 * e1 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu) + (151 * e1 ** 3 / 96) * Math.sin(6 * mu) + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+  const s = Math.sin(p1), c = Math.cos(p1), C1 = ep2 * c * c, T1 = Math.tan(p1) ** 2, N1 = a / Math.sqrt(1 - e2 * s * s), R1 = a * (1 - e2) / Math.pow(1 - e2 * s * s, 1.5), D = x / (N1 * k0);
+  const lat = p1 - (N1 * Math.tan(p1) / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4 / 24 + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6 / 720);
+  const lon = lon0 + (D - (1 + 2 * T1 + C1) * D ** 3 / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5 / 120) / c;
+  return [lon * 180 / Math.PI, lat * 180 / Math.PI];
+}
+async function loadHeights(url) {
+  const r = await fetch(url); if (!r.ok) throw new Error(url + " " + r.status);
+  const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+  const cv = document.createElement("canvas"); cv.width = bmp.width; cv.height = bmp.height;
+  const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(bmp, 0, 0);
+  const d = cx.getImageData(0, 0, bmp.width, bmp.height).data, v = new Float32Array(bmp.width * bmp.height);
+  for (let k = 0; k < v.length; k++) v[k] = Math.max(0, d[4 * k] * 256 + d[4 * k + 1] + d[4 * k + 2] / 256 - 32768);
+  return v;
+}
+
+// ---------------- The eruption: published values (see How this works) ----------------
+// Pumice fall thickness (m): 4.5 * exp(-r / 20 km) along a south-east axis (150 degrees), narrowing with angle (sigma 25 degrees).
+// Calibrated to about 2.8 m at Pompeii (9.4 km, bearing 148) and about 2 m at Stabiae (14.8 km, bearing 160).
+const FALL = { A: 4.5, L: 20000, axis: 150, sig2x2: 2 * 25 * 25 };
+let VENT = [0, 0];
+const bearing = (dx, dy) => (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+const angDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+function fallAt(x, y) { const dx = x - VENT[0], dy = y - VENT[1], r = Math.hypot(dx, dy), da = angDiff(bearing(dx, dy), FALL.axis);
+  return FALL.A * Math.exp(-r / FALL.L) * Math.exp(-da * da / FALL.sig2x2); }
+const inSector = (b, a0, a1) => a0 <= a1 ? b >= a0 && b <= a1 : b >= a0 || b <= a1;
+const PDC_SECTOR = [95, 335];        // the currents spread south, east and west; Monte Somma's wall shielded the north
+const HERC_SECTOR = [200, 300];
+
+// Story timeline in hours from midnight at the start of day 1. Times after Sigurdsson et al. 1985 (approximate).
+const MOMENTS = [
+  { when: "Day 1 · morning", h0: 8, h1: 10, dur: 12, title: "An ordinary morning",
+    text: "Pompeii is a busy town of houses, shops, bars and bakeries between the mountain and the sea. People are still repairing damage from a strong earthquake about 17 years earlier; in the Forum, the Temple of Jupiter was probably still under repair. The mountain is green with vineyards. The geographer Strabo, writing some 60 years before, noticed that its flat top looked burnt, as if it had once been on fire." },
+  { when: "Day 1 · late morning", h0: 10, h1: 13, dur: 10, title: "First signs",
+    text: "Small explosions open a vent in the mountain and a little ash falls to the east. The ground shakes. Pliny the Younger, across the bay, later wrote that there had been earth tremors for many days, but people in Campania were used to them." },
+  { when: "Day 1 · about 1 pm", h0: 13, h1: 14.5, dur: 12, title: "The column",
+    text: "A column of hot gas, ash and pumice shoots up from the mountain to about 27 km. Pliny, watching from Misenum about 30 km away, compared its shape to an umbrella pine: a tall trunk that spreads out at the top." },
+  { when: "Day 1 · afternoon", h0: 14.5, h1: 17, dur: 12, title: "White pumice falls",
+    text: "The wind carries the cloud south-east, straight over Pompeii. Light white pumice stones rain down, building up by about 15 cm an hour. The sky turns dark in the middle of the day. Many people leave the town; others shelter indoors." },
+  { when: "Day 1 · late afternoon and evening", h0: 17, h1: 21, dur: 12, title: "Roofs give way",
+    text: "The weight of the pumice breaks roofs. Studies estimate that roofs began to fail under less than a metre of pumice, within a few hours of the start. Of the victims whose remains have been studied, about 4 in 10 died during the pumice fall, many of them when roofs and walls collapsed." },
+  { when: "Day 1 · night", h0: 21, h1: 25, dur: 10, title: "Grey pumice",
+    text: "The column grows to about 33 km. Now heavier grey pumice falls. By the end, the layer at Pompeii is up to about 2.8 m deep." },
+  { when: "Day 2 · about 1 am", h0: 25, h1: 30.5, dur: 12, title: "Herculaneum",
+    text: "Parts of the column collapse. A pyroclastic current, a fast, ground-hugging avalanche of hot gas, ash and rock, sweeps down the western slope and over Herculaneum, about 7 km from the vent. About 300 people sheltering in the boat sheds by the shore die." },
+  { when: "Day 2 · about 7 am", h0: 30.5, h1: 31.6, dur: 16, title: "The current reaches Pompeii",
+    text: "Another current flows over Pompeii and lasts at least about 17 minutes. Scientists still debate how hot it was (estimates range from about 115 °C to 300 °C) and whether people died from the heat or from breathing the ash. Everyone still in the town dies. More than 1,150 victims have been found at Pompeii." },
+  { when: "Today", h0: 31.6, h1: 31.6, dur: 0, today: true, title: "What remains",
+    text: "Pompeii lay buried under several metres of pumice and ash until excavations began in 1748. The eruption enlarged the old crater, and a new cone, the Gran Cono, has since grown inside it; its top was blown off in 1631 and rebuilt by eruptions up to 1944. This view shows today's ground and satellite image: compare the mountain with the one at the start." }
+];
+const SEG = MOMENTS.filter(m => m.dur);
+const PLAY_S = SEG.reduce((s, m) => s + m.dur, 0);
+const T_END = SEG[SEG.length - 1].h1;
+function hoursAt(sec) { let s = sec; for (const m of SEG) { if (s <= m.dur) return m.h0 + (m.h1 - m.h0) * s / m.dur; s -= m.dur; } return T_END; }
+function secAt(h) { let s = 0; for (const m of SEG) { if (h <= m.h1) return s + m.dur * Math.max(0, h - m.h0) / (m.h1 - m.h0); s += m.dur; } return PLAY_S; }
+function fmtTime(h) { const day = h >= 24 ? 2 : 1, hh = Math.floor(h % 24), mm = Math.floor((h % 1) * 6) * 10;
+  return `AD 79 · Day ${day} · about ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; }
+const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+function stateAt(h, today) {
+  const s = { h, top: 0, rate: 0, windB: 150, windV: 2500, small: 0, fall: 0, grey: 0, hercR: 0, pdcR: 0, dark: 0, night: 0, people: 0, leave: 0,
+    rumble: 0.1, roar: 0, booms: 0, patter: 0, today: !!today };
+  if (today) return s;
+  // first signs: small explosions, ash blown east
+  if (h >= 10 && h < 13) { s.small = 1; s.top = 3000; s.rate = 40; s.windB = 90; s.windV = 900; s.rumble = 0.3; s.booms = 0.3; }
+  // the Plinian column
+  if (h >= 13) { s.small = 0; s.rate = 420; s.windB = 150; s.roar = 0.6; s.rumble = 0.8; s.booms = 0.5;
+    s.top = h < 13.8 ? lerp(4000, 27000, sstep(13, 13.8, h)) : h < 20 ? 27000 : h < 24 ? lerp(27000, 33000, (h - 20) / 4) : h < 25 ? 33000 : lerp(33000, 20000, (h - 25) / 6.6); }
+  if (h >= 25) { s.rate = 300 + 150 * Math.max(0, Math.sin(h * 9)); }
+  if (h >= T_END) { s.rate = 120; s.roar = 0.3; }
+  // pumice at Pompeii: a steady fall from about 13:30 to 06:30 on day 2 (17 hours, up to 2.8 m, about 16 cm an hour)
+  s.fall = h < 13.5 ? 0 : h < 30.5 ? (h - 13.5) / 17 : 1;
+  s.grey = sstep(20, 21, h);
+  s.patter = h >= 13.5 && h < 30.8 ? 1 : 0;
+  // currents: Herculaneum from about 01:00 (7 km); the fourth current spreads up to ~20 km, reaching Pompeii about 07:00
+  s.hercR = h < 25 ? 0 : lerp(0, 7500, (h - 25) / 0.25);
+  s.pdcR = h < 30.75 ? 0 : lerp(0, 20000, (h - 30.75) / 0.5);
+  // darkness under the cloud, and night (sunset about 19:00, dawn about 06:00)
+  s.dark = sstep(13.5, 15.5, h) * 0.85;
+  s.night = h < 19 ? 0 : h < 20 ? (h - 19) : h < 29.5 ? 1 : h < 30.5 ? 1 - (h - 29.5) : 0;
+  // people: normal; a few look up (first signs); most stop and look (column); then they shelter or leave
+  s.people = h < 10 ? 0 : h < 13 ? 1 : h < 14.5 ? 2 : 3;
+  s.leave = h < 14.5 ? 0 : Math.min(1, (h - 14.5) / 4);
+  return s;
+}
+
+// ---------------- Three.js scene ----------------
+const canvas = $("three");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+const scene = new THREE.Scene();
+const bg = new THREE.Color(0x1c1b19); scene.background = bg;
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 50); scene.add(camera);
+camera.position.set(0.0, 0.95, 1.65);
+const controls = new OrbitControls(camera, canvas); controls.target.set(0.04, 0.28, 0.0); controls.enableDamping = true;
+controls.minDistance = 0.12; controls.maxDistance = 4; controls.maxPolarAngle = Math.PI * 0.49;
+const hemi = new THREE.HemisphereLight(0xfff6e8, 0x40382e, 1.2); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(0.5, 1.2, 0.3); scene.add(sun);
+const SUN_DIR = new THREE.Vector3(0.5, 1.2, 0.3).normalize();
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+const TABLE_WIDTH = 1.0;
+const table = new THREE.Group(); scene.add(table);
+const model = new THREE.Group(); table.add(model);
+let SCALE = 1, EXAG = 1.5, exag = EXAG;
+const HBASE = -20;
+
+let h79 = null, hNow = null, imgInfo = null, town = null;
+let today = false;
+const hgt = () => today ? hNow : h79;
+const hBilOf = (arr, x, y) => { const fx = (x - XMIN) / CELL - 0.5, fy = (YMAX - y) / CELL - 0.5, i = Math.max(0, Math.min(W - 2, Math.floor(fx))), j = Math.max(0, Math.min(H - 2, Math.floor(fy)));
+  const a = Math.min(1, Math.max(0, fx - i)), b = Math.min(1, Math.max(0, fy - j)), q = j * W + i;
+  return arr[q] * (1 - a) * (1 - b) + arr[q + 1] * a * (1 - b) + arr[q + W] * (1 - a) * b + arr[q + W + 1] * a * b; };
+const hBil = (x, y) => hBilOf(hgt(), x, y);
+let curFall = 0;                       // fraction of the final pumice thickness on the ground now
+const groundAt = (x, y) => hBil(x, y) + (today ? 0 : fallAt(x, y) * curFall);
+// table coordinates for particles: the ground part is exaggerated like the model; height above the ground is not
+const tpos = (x, y, z, out, o) => { const g = hBil(x, y), zz = (Math.min(z, g) - HBASE) * exag + Math.max(0, z - g); out[o] = x * SCALE; out[o + 1] = zz * SCALE; out[o + 2] = -y * SCALE; };
+
+// ---------------- Shared shader code ----------------
+const GLSL_COMMON = `
+  uniform vec2 uVent; uniform float uFall, uToday;
+  float bearingDeg(vec2 d) { return mod(degrees(atan(d.x, d.y)) + 360.0, 360.0); }
+  float angDiff(float a, float b) { float d = abs(a - b); return min(d, 360.0 - d); }
+  float fallAt(vec2 p) { vec2 d = p - uVent; float r = length(d); float da = angDiff(bearingDeg(d), ${FALL.axis.toFixed(1)});
+    return ${FALL.A.toFixed(2)} * exp(-r / ${FALL.L.toFixed(1)}) * exp(-da * da / ${FALL.sig2x2.toFixed(1)}); }
+  bool inSector(float b, float a0, float a1) { return a0 <= a1 ? (b >= a0 && b <= a1) : (b >= a0 || b <= a1); }
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+  float plume(vec2 p) { vec2 d = p - uVent; float r = length(d); float da = angDiff(bearingDeg(d), 150.0);
+    return exp(-da * da / 1800.0) * smoothstep(1500.0, 5000.0, r) * (1.0 - smoothstep(25000.0, 45000.0, r)); }
+`;
+const LIGHT_UNIFORMS = () => ({ uSun: { value: SUN_DIR.clone() }, uAmb: { value: 0.55 }, uSunI: { value: 0.75 }, uDark: { value: 0 },
+  uFogC: { value: new THREE.Color(0xa9bccd) }, uFogNear: { value: 1e9 }, uFogFar: { value: 2e9 } });
+const GLSL_LIGHT = `
+  uniform vec3 uSun; uniform float uAmb, uSunI, uDark; uniform vec3 uFogC; uniform float uFogNear, uFogFar;
+  vec3 shade(vec3 c, vec3 n, vec2 p, float dist) {
+    float lit = uAmb + uSunI * max(dot(normalize(n), normalize(uSun)), 0.0);
+    lit *= 1.0 - uDark * plume(p);
+    vec3 col = c * lit;
+    return mix(col, uFogC, smoothstep(uFogNear, uFogFar, dist));
+  }
+`;
+const SHARED = { uVent: { value: new THREE.Vector2() }, uFall: { value: 0 }, uToday: { value: 0 }, uGrey: { value: 0 }, uHercR: { value: 0 }, uPdcR: { value: 0 } };
+const LIGHT = LIGHT_UNIFORMS();
+
+// Ground: AD 79 land cover (no satellite image of AD 79 exists), the pumice, the currents' deposits; today: Esri World Imagery.
+function groundMaterial(imgTex) {
+  return new THREE.ShaderMaterial({
+    uniforms: Object.assign({ uImg: { value: imgTex }, uTown: SHARED_TOWN.uTown, uTownBox: SHARED_TOWN.uTownBox }, SHARED, LIGHT),
+    vertexShader: `${GLSL_COMMON}
+      attribute vec2 aH; attribute vec2 aXY; attribute vec3 aN79; attribute vec3 aNNow;
+      varying vec2 vXY; varying vec3 vN; varying float vH; varying vec2 vUv; varying float vDist; varying float vDep;
+      void main() {
+        float h = mix(aH.x, aH.y, uToday);
+        float dep = fallAt(aXY) * uFall * (1.0 - uToday);
+        vec3 p = vec3(aXY.x, h - ${HBASE.toFixed(1)} + dep, -aXY.y);
+        vXY = aXY; vH = h; vN = normalize(mix(aN79, aNNow, uToday)); vUv = uv; vDep = dep;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); vDist = length(mv.xyz) / max(length(modelMatrix[0].xyz) * 0.0 + 1.0, 1.0);
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `${GLSL_COMMON}${GLSL_LIGHT}
+      uniform sampler2D uImg; uniform sampler2D uTown; uniform vec4 uTownBox; uniform float uGrey, uHercR, uPdcR;
+      varying vec2 vXY; varying vec3 vN; varying float vH; varying vec2 vUv; varying float vDist; varying float vDep;
+      vec3 landcover(vec2 p, float h, float r) {
+        if (h <= 0.5) return vec3(0.12, 0.25, 0.34) + 0.02 * vnoise(p / 60.0);
+        float n1 = vnoise(p / 170.0), n3 = vnoise(p / 260.0 + 7.0);
+        vec3 c = mix(vec3(0.42, 0.48, 0.22), vec3(0.54, 0.51, 0.27), smoothstep(0.45, 0.6, n1));   // fields: green and gold
+        c = mix(c, vec3(0.28, 0.38, 0.19), step(0.72, n3));                               // orchards
+        float rows = clamp(1.0 - fwidth(p.x * 1.3 + p.y * 0.45) * 1.5, 0.0, 1.0);          // rows only where they can be seen
+        vec3 vine = vec3(0.29, 0.39, 0.16) * (1.0 + 0.14 * rows * sin(p.x * 1.3 + p.y * 0.45)); // vineyards in rows
+        float onV = 1.0 - smoothstep(6500.0, 9500.0, r);
+        c = mix(c, vine, onV * smoothstep(40.0, 120.0, h) * (1.0 - smoothstep(600.0, 760.0, h)));
+        c = mix(c, vec3(0.20, 0.29, 0.15), smoothstep(600.0, 780.0, h) * onV);             // woods and scrub higher up
+        c = mix(c, vec3(0.20, 0.29, 0.15), (1.0 - onV) * smoothstep(150.0, 350.0, h));      // the hills to the south
+        c = mix(c, vec3(0.36, 0.34, 0.31), (1.0 - smoothstep(2300.0, 2800.0, r)) * smoothstep(800.0, 850.0, h));  // the flat, ash-coloured top (Strabo)
+        c *= 0.92 + 0.16 * vnoise(p / 23.0);
+        return c;
+      }
+      void main() {
+        vec2 d = vXY - uVent; float r = length(d), b = bearingDeg(d);
+        vec3 c;
+        if (uToday > 0.5) { c = texture2D(uImg, vUv).rgb; }
+        else {
+          c = landcover(vXY, vH, r);
+          vec2 tuv = (vXY - uTownBox.xy) / (uTownBox.zw - uTownBox.xy);
+          if (tuv.x > 0.0 && tuv.y > 0.0 && tuv.x < 1.0 && tuv.y < 1.0) { vec4 t = texture2D(uTown, vec2(tuv.x, 1.0 - tuv.y)); c = mix(c, t.rgb * (0.9 + 0.2 * vnoise(vXY * 0.7)), t.a); }
+          float cover = smoothstep(0.03, 0.3, vDep);
+          vec3 pum = mix(vec3(0.84, 0.82, 0.76), vec3(0.58, 0.57, 0.55), uGrey) * (0.9 + 0.2 * vnoise(vXY * 3.0));
+          c = mix(c, pum, cover);
+          float pdc = 0.0;
+          if (r < uPdcR && inSector(b, ${PDC_SECTOR[0]}.0, ${PDC_SECTOR[1]}.0)) pdc = 1.0 - smoothstep(uPdcR - 300.0, uPdcR, r);
+          if (r < uHercR && inSector(b, ${HERC_SECTOR[0]}.0, ${HERC_SECTOR[1]}.0)) pdc = max(pdc, 1.0 - smoothstep(uHercR - 300.0, uHercR, r));
+          c = mix(c, vec3(0.40, 0.38, 0.36) * (0.9 + 0.2 * vnoise(vXY / 9.0)), pdc * 0.92 * step(0.5, vH));
+        }
+        gl_FragColor = vec4(shade(c, vN, vXY, vDist), 1.0);
+        #include <colorspace_fragment>
+      }`
+  });
+}
+const SHARED_TOWN = { uTown: { value: null }, uTownBox: { value: new THREE.Vector4(0, 0, 1, 1) } };
+
+const RS = 3;   // table mesh: every 3rd grid cell (about 78 m)
+let terrain = null, baseIdx = null, RW, RH;
+function terrainGeometry(i0, j0, nI, nJ, step, bilinear, uvOf) {
+  // a grid of vertices; step in cells (table) or a metre spacing with bilinear heights (life-size patch)
+  const n = nI * nJ, aH = new Float32Array(n * 2), aXY = new Float32Array(n * 2), uv = new Float32Array(n * 2), pos = new Float32Array(n * 3);
+  for (let j = 0; j < nJ; j++) for (let i = 0; i < nI; i++) {
+    const k = j * nI + i; let x, y, a, b;
+    if (bilinear) { x = bilinear.x0 + i * step; y = bilinear.y1 - j * step; a = hBilOf(h79, x, y); b = hBilOf(hNow, x, y); }
+    else { const ci = Math.min(W - 1, i0 + i * step), cj = Math.min(H - 1, j0 + j * step), c = cj * W + ci; x = XMIN + (ci + 0.5) * CELL; y = YMAX - (cj + 0.5) * CELL; a = h79[c]; b = hNow[c]; }
+    aH[k * 2] = a; aH[k * 2 + 1] = b; aXY[k * 2] = x; aXY[k * 2 + 1] = y; pos.set([x, a - HBASE, -y], k * 3);
+    const [u, v] = uvOf(x, y); uv[k * 2] = u; uv[k * 2 + 1] = v;
+  }
+  const idx = []; for (let j = 0; j < nJ - 1; j++) for (let i = 0; i < nI - 1; i++) { const a = j * nI + i, b = a + 1, c = a + nI, d = c + 1; idx.push(a, c, b, b, c, d); }
+  const geo = new THREE.BufferGeometry(); geo.setIndex(new THREE.Uint32BufferAttribute(idx, 1));
+  const normalsFor = (o) => { for (let k = 0; k < n; k++) pos[k * 3 + 1] = aH[k * 2 + o] - HBASE; geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.computeVertexNormals(); return geo.attributes.normal.array.slice(); };
+  const nNow = normalsFor(1), n79 = normalsFor(0);
+  geo.setAttribute("aN79", new THREE.BufferAttribute(n79, 3)); geo.setAttribute("aNNow", new THREE.BufferAttribute(nNow, 3));
+  geo.setAttribute("aH", new THREE.BufferAttribute(aH, 2)); geo.setAttribute("aXY", new THREE.BufferAttribute(aXY, 2)); geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);
+  return { geo, idx };
+}
+function buildTerrain() {
+  RW = Math.floor((W - 1) / RS) + 1; RH = Math.floor((H - 1) / RS) + 1;
+  const { geo, idx } = terrainGeometry(0, 0, RW, RH, RS, null, (x, y) => imgInfo.uvOf(...utmToLL(x + E0, y + N0)));
+  terrain = new THREE.Mesh(geo, groundMaterial(imgInfo.tex)); terrain.frustumCulled = false; model.add(terrain); baseIdx = geo.index;
+  // sides, so it reads as a model on the table
+  const sp = [], si = [], P = geo.attributes.position.array, A = geo.attributes.aH.array;
+  const edge = (list) => { const start = sp.length / 3; list.forEach(k => { const x = P[k * 3], z = P[k * 3 + 2], y = A[k * 2] - HBASE; sp.push(x, y, z, x, 0, z); });
+    for (let m = 0; m < list.length - 1; m++) { const a = start + m * 2; si.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); } };
+  const top = [], bottom = [], left = [], right = [];
+  for (let ri = 0; ri < RW; ri++) { top.push(ri); bottom.push((RH - 1) * RW + ri); }
+  for (let rj = 0; rj < RH; rj++) { left.push(rj * RW); right.push(rj * RW + RW - 1); }
+  [top, right, bottom.slice().reverse(), left.slice().reverse()].forEach(edge);
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3)); sg.setIndex(si); sg.computeVertexNormals();
+  model.add(new THREE.Mesh(sg, new THREE.MeshLambertMaterial({ color: 0x5b4a3a, side: THREE.DoubleSide })));
+}
+
+// Esri World Imagery for today's view, stitched into one texture
+const tileXY = (lon, lat, z) => { const n = 2 ** z; const x = (lon + 180) / 360 * n;
+  const lr = lat * Math.PI / 180, y = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n; return [x, y]; };
+function loadImage(url) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => rej(new Error("image " + url)); im.src = url; }); }
+const IMG_URL = (z, y, x) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+async function loadImagery(bounds, maxTex) {
+  const [lo0, la0, lo1, la1] = bounds; let z = 14;
+  const fit = (zz) => { const [a, b] = tileXY(lo0, la1, zz), [c, d] = tileXY(lo1, la0, zz);
+    return (Math.floor(c) - Math.floor(a) + 1) * 256 <= maxTex && (Math.floor(d) - Math.floor(b) + 1) * 256 <= maxTex; };
+  if (!fit(z)) z = 13;
+  const [x0f, y0f] = tileXY(lo0, la1, z), [x1f, y1f] = tileXY(lo1, la0, z);
+  const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
+  const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256;
+  const cx = cv.getContext("2d"); cx.fillStyle = "#5d6b52"; cx.fillRect(0, 0, cv.width, cv.height);
+  const tex = new THREE.CanvasTexture(cv); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  let ok = 0;
+  const jobs = [];
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++)
+    jobs.push(loadImage(IMG_URL(z, ty, tx)).then(im => { cx.drawImage(im, (tx - tx0) * 256, (ty - ty0) * 256); ok++; }).catch(() => {}));
+  const done = Promise.all(jobs).then(() => { tex.needsUpdate = true; return ok; });   // loads in the background: only needed for "Today"
+  const uvOf = (lon, lat) => { const [fx, fy] = tileXY(lon, lat, z); return [(fx - tx0) / (tx1 - tx0 + 1), (fy - ty0) / (ty1 - ty0 + 1)]; };
+  return { canvas: cv, tex, uvOf, zoom: z, done };
+}
+
+// ---------------- The town ----------------
+// Ground inside the walls (streets, gardens, the Forum) is painted into a texture the ground shader reads.
+function buildTownGround() {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of town.wall) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  x0 -= 20; y0 -= 20; x1 += 20; y1 += 20;
+  const S = 1.0, cv = document.createElement("canvas"); cv.width = Math.ceil((x1 - x0) / S); cv.height = Math.ceil((y1 - y0) / S);
+  const cx = cv.getContext("2d"), path = (ring) => { cx.beginPath(); ring.forEach(([x, y], i) => { const px = (x - x0) / S, py = (y1 - y) / S; i ? cx.lineTo(px, py) : cx.moveTo(px, py); }); cx.closePath(); };
+  path(town.wall); cx.fillStyle = "rgb(118,108,96)"; cx.fill();                       // streets: grey-brown lava-stone paving
+  cx.fillStyle = "rgb(84,110,58)"; for (const g of town.gardens) { path(g); cx.fill(); } // gardens
+  for (const p of town.public) if (p.hole && p.kind === "palestra") { path(p.hole); cx.fill(); }
+  cx.fillStyle = "rgb(205,198,182)"; path(town.forum); cx.fill();                      // the Forum's pale paving
+  cx.fillStyle = "rgb(176,150,110)"; for (const p of town.public) if (p.kind === "amphitheatre") { path(p.hole); cx.fill(); }   // the arena's sand
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  SHARED_TOWN.uTown.value = tex;
+  const [a0, b0] = toLocal(x0, y0), [a1, b1] = toLocal(x1, y1); SHARED_TOWN.uTownBox.value.set(a0, b0, a1, b1);
+}
+
+// Walls and roofs of every building, merged into two meshes. Roofs drop when the pumice on them passes their limit.
+const BLD = { uRuin: { value: 0 } };
+function buildingMaterial(isRoof) {
+  return new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, SHARED, LIGHT, BLD),
+    vertexShader: `${GLSL_COMMON}
+      attribute float aBase; attribute vec3 aTint; attribute float aLimit; attribute vec2 aXY; attribute vec3 aU;
+      uniform float uRuin;
+      varying vec3 vN; varying float vUp; varying vec3 vTint; varying vec2 vXY; varying float vDist; varying float vGone; varying vec3 vU;
+      void main() {
+        vec3 p = position; float up = p.y - aBase;
+        vGone = 0.0;
+        ${isRoof ? `
+        float dep = fallAt(aXY) * uFall * (1.0 - uToday);
+        float drop = smoothstep(aLimit, aLimit + 0.12, dep);
+        p.y = mix(p.y, aBase + dep - 0.4, drop);
+        vGone = max(drop, uToday);` : `
+        p.y = aBase + up * mix(1.0, 0.55, uRuin * uToday);`}
+        vN = normal; vUp = up; vTint = aTint; vXY = aXY; vU = aU;
+        vec4 mv = modelViewMatrix * vec4(p.x, p.y - ${HBASE.toFixed(1)}, p.z, 1.0); vDist = length(mv.xyz);
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `${GLSL_COMMON}${GLSL_LIGHT}
+      varying vec3 vN; varying float vUp; varying vec3 vTint; varying vec2 vXY; varying float vDist; varying float vGone; varying vec3 vU;
+      void main() {
+        ${isRoof ? `if (vGone > 0.98) discard;
+        vec3 c = vTint * (0.85 + 0.25 * vnoise(vXY * 1.7));` : `
+        vec3 c = vUp < 1.1 ? vec3(0.50, 0.13, 0.09) : vTint;          // a dark red band at the foot of the wall, plaster above
+        c *= 0.9 + 0.12 * vnoise(vXY * 0.9 + vUp);
+        if (vU.y > 0.5 && vU.z - 0.0 > 5.0) {                         // doorways (1) or wide shop openings (2), kept clear of corners
+          float per = vU.y > 1.5 ? 6.0 : 9.0, w = vU.y > 1.5 ? 3.0 : 1.3, f = mod(vU.x, per);
+          if (f < w && vUp > 0.0 && vUp < (vU.y > 1.5 ? 2.9 : 2.4) && vU.x > 1.5 && vU.x < vU.z - 1.5) c = vec3(0.10, 0.08, 0.07);
+        }`}
+        gl_FragColor = vec4(shade(c, vN, vXY, vDist), 1.0);
+        #include <colorspace_fragment>
+      }`,
+    side: THREE.DoubleSide
+  });
+}
+let townMeshes = [];
+function buildTown() {
+  const wp = [], wn = [], wb = [], wt = [], wxy = [], wu = [], rp = [], rn = [], rb = [], rt = [], rl = [], rxy = [];
+  const rand = (() => { let s = 79; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  const PLASTER = [[0.86, 0.80, 0.68], [0.80, 0.68, 0.50], [0.90, 0.86, 0.78], [0.74, 0.56, 0.40], [0.84, 0.74, 0.58]];
+  const TILE = [0.62, 0.30, 0.18];
+  const local = (ring) => ring.map(([x, y]) => toLocal(x, y));
+  const area = (r) => { let s = 0; for (let i = 0; i < r.length - 1; i++) s += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]; return s / 2; };
+  function walls(ring, base, h, tint, outward, doors) {
+    // ring is closed (last = first); counter-clockwise rings have the outside on the right
+    const ccw = area(ring) > 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [x0, y0] = ring[i], [x1, y1] = ring[i + 1], L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.2) continue;
+      let nx = (y1 - y0) / L, ny = -(x1 - x0) / L; if (!ccw) { nx = -nx; ny = -ny; } if (!outward) { nx = -nx; ny = -ny; }
+      const lo = base - 3, hi = base + h;
+      const quad = [[x0, lo, y0, 0], [x1, lo, y1, L], [x1, hi, y1, L], [x0, lo, y0, 0], [x1, hi, y1, L], [x0, hi, y0, 0]];
+      const kind = doors ? (rand() < 0.45 ? 2 : 1) : 0, off = rand() * 6;     // 1: house doors, 2: wide shop openings
+      for (const [x, z, y, u] of quad) { wp.push(x, z, -y); wn.push(nx, 0, -ny); wb.push(base); wt.push(...tint); wxy.push(x, y); wu.push(u + off, kind, L + off); }
+    }
+  }
+  function roof(ring, hole, base, h, tint, limit) {
+    const c = ring.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y)), hs = hole ? [hole.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y))] : [];
+    const all = c.concat(...hs), tris = THREE.ShapeUtils.triangulateShape(c, hs);
+    for (const t of tris) for (const k of t) { const v = all[k]; rp.push(v.x, base + h, -v.y); rn.push(0, 1, 0); rb.push(base); rt.push(...tint); rl.push(limit); rxy.push(v.x, v.y); }
+  }
+  const baseOf = (ring) => { let m = Infinity; for (const [x, y] of ring) m = Math.min(m, hBilOf(h79, x, y)); return m; };
+  // houses
+  for (const lot of town.lots) {
+    const r = local(lot.poly); if (r.length < 4) continue;
+    const base = baseOf(r), tint = PLASTER[Math.floor(rand() * PLASTER.length)];
+    walls(r, base, lot.h, tint, true, true);
+    roof(r, null, base, lot.h, TILE.map(v => v * (0.9 + 0.2 * rand())), 0.3 + 0.7 * rand());   // roofs fail under 0.3-1 m of pumice (Luongo et al. 2003)
+  }
+  // public buildings: pale stone, taller; the Palestra and the amphitheatre are open in the middle
+  for (const p of town.public) {
+    if (p.kind === "open") continue;
+    const r = local(p.poly), hole = p.hole ? local(p.hole) : null, base = baseOf(r), stone = [0.86, 0.83, 0.75];
+    walls(r, base, p.h, stone, true); if (hole) walls(hole, base, p.h, stone, false);
+    roof(r, hole, base, p.h, p.kind === "amphitheatre" ? [0.70, 0.66, 0.58] : TILE, p.kind === "amphitheatre" ? 99 : 0.5 + 0.5 * rand());
+  }
+  // Temple of Jupiter: a high podium and the temple on it, still under repair
+  const jr = local(town.jupiter), jb = baseOf(jr);
+  walls(jr, jb, 3.2, [0.86, 0.83, 0.75], true); roof(jr, null, jb, 3.2, [0.80, 0.77, 0.70], 99);
+  const jc = jr.slice(0, 4).reduce((a, v) => [a[0] + v[0] / 4, a[1] + v[1] / 4], [0, 0]);
+  const cella = jr.slice(0, 5).map(([x, y]) => [jc[0] + (x - jc[0]) * 0.7, jc[1] + (y - jc[1]) * 0.62]);
+  walls(cella, jb + 3.2, 11, [0.86, 0.83, 0.75], true); roof(cella, null, jb + 3.2, 11, TILE, 0.8);
+  // the city wall: a band 7 m high and 4 m thick, open at the gates
+  const wr = local(town.wall), gates = town.gates.map(g => toLocal(...g.xy));
+  for (let i = 0; i < wr.length - 1; i++) {
+    const [x0, y0] = wr[i], [x1, y1] = wr[i + 1], mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    if (gates.some(([gx, gy]) => Math.hypot(gx - mx, gy - my) < 9)) continue;
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) continue; const nx = -(y1 - y0) / L * 2, ny = (x1 - x0) / L * 2;
+    const seg = [[x0 + nx, y0 + ny], [x1 + nx, y1 + ny], [x1 - nx, y1 - ny], [x0 - nx, y0 - ny], [x0 + nx, y0 + ny]], b = baseOf(seg);
+    walls(seg, b, 7, [0.66, 0.62, 0.55], true); roof(seg, null, b, 7, [0.62, 0.58, 0.52], 99);
+  }
+  const mk = (P, N, B, T, XY, L, isRoof, U) => {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
+    g.setAttribute("aBase", new THREE.Float32BufferAttribute(B, 1)); g.setAttribute("aTint", new THREE.Float32BufferAttribute(T, 3)); g.setAttribute("aXY", new THREE.Float32BufferAttribute(XY, 2));
+    g.setAttribute("aLimit", new THREE.Float32BufferAttribute(L || new Array(B.length).fill(99), 1));
+    g.setAttribute("aU", new THREE.Float32BufferAttribute(U || new Array(B.length * 3).fill(0), 3));
+    const m = new THREE.Mesh(g, buildingMaterial(isRoof)); m.frustumCulled = false; model.add(m); townMeshes.push(m); return m; };
+  // vertices are stored as (x, absolute height, -y); the shader subtracts HBASE
+  mk(wp, wn, wb, wt, wxy, null, false, wu); mk(rp, rn, rb, rt, rxy, rl, true);
+  buildColumnsAndTrees(jr, jb, jc, rand);
+  BLD.uRuin.value = 1;
+}
+// Columns round the Forum and on the temple front, scaffolding on the temple, trees in the gardens
+let props = null;
+function buildColumnsAndTrees(jr, jb, jc, rand) {
+  const colGeo = new THREE.CylinderGeometry(0.4, 0.45, 1, 10).translate(0, 0.5, 0), dummy = new THREE.Object3D();
+  const cols = [];
+  const fr = town.forum.map(([x, y]) => toLocal(x, y));
+  for (let i = 0; i < fr.length - 1; i++) { const [x0, y0] = fr[i], [x1, y1] = fr[i + 1], L = Math.hypot(x1 - x0, y1 - y0);
+    for (let s = 2; s < L - 1; s += 4) { const x = x0 + (x1 - x0) * s / L, y = y0 + (y1 - y0) * s / L;
+      if (Math.hypot(x - jc[0], y - jc[1]) < 24) continue; cols.push([x, y, hBilOf(h79, x, y), 6.5]); } }
+  // six columns across the temple front (the end facing the Forum)
+  const ends = [0, 1, 2, 3].map(i => [(jr[i][0] + jr[i + 1][0]) / 2, (jr[i][1] + jr[i + 1][1]) / 2]);
+  const fc = town.forum.map(([x, y]) => toLocal(x, y)).reduce((a, v, _, arr) => [a[0] + v[0] / arr.length, a[1] + v[1] / arr.length], [0, 0]);
+  const front = ends.reduce((b, e) => Math.hypot(e[0] - fc[0], e[1] - fc[1]) < Math.hypot(b[0] - fc[0], b[1] - fc[1]) ? e : b);
+  const k = ends.indexOf(front), ea = jr[k], eb = jr[k + 1];
+  for (let i = 0; i < 6; i++) { const t = (i + 0.5) / 6, x = ea[0] + (eb[0] - ea[0]) * t, y = ea[1] + (eb[1] - ea[1]) * t;
+    cols.push([x + (jc[0] - x) * 0.12, y + (jc[1] - y) * 0.12, jb + 3.2, 10]); }
+  const colMesh = new THREE.InstancedMesh(colGeo, new THREE.MeshLambertMaterial({ color: 0xdcd5c4 }), cols.length);
+  cols.forEach(([x, y, z, h], i) => { dummy.position.set(x, z - HBASE, -y); dummy.scale.set(1, h, 1); dummy.updateMatrix(); colMesh.setMatrixAt(i, dummy.matrix); });
+  // scaffolding: wooden poles round the temple (the repairs after the earthquake)
+  const poles = []; const jr4 = jr.slice(0, 5);
+  for (let i = 0; i < 4; i++) { const [x0, y0] = jr4[i], [x1, y1] = jr4[i + 1], L = Math.hypot(x1 - x0, y1 - y0);
+    for (let s = 0; s <= L; s += 3) { const x = x0 + (x1 - x0) * s / L, y = y0 + (y1 - y0) * s / L; poles.push([x + (x - jc[0]) * 0.04, y + (y - jc[1]) * 0.04]); } }
+  const poleMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 1, 0.15).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0x6b4a2b }), poles.length);
+  poles.forEach(([x, y], i) => { dummy.position.set(x, jb - HBASE, -y); dummy.scale.set(1, 15, 1); dummy.updateMatrix(); poleMesh.setMatrixAt(i, dummy.matrix); });
+  // trees: a few in each garden and in the Palestra
+  const trees = [];
+  const inRing = (x, y, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const scatter = (ring, per) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const n = Math.min(40, Math.round((x1 - x0) * (y1 - y0) / per)); for (let t = 0, got = 0; t < n * 4 && got < n; t++) { const x = x0 + rand() * (x1 - x0), y = y0 + rand() * (y1 - y0); if (inRing(x, y, ring)) { trees.push([x, y, 0.7 + rand() * 0.6]); got++; } } };
+  for (const g of town.gardens) scatter(g.map(([x, y]) => toLocal(x, y)), 260);
+  for (const p of town.public) if (p.kind === "palestra" && p.hole) scatter(p.hole.map(([x, y]) => toLocal(x, y)), 180);
+  const trunk = new THREE.CylinderGeometry(0.18, 0.25, 3, 6).translate(0, 1.5, 0), crown = new THREE.IcosahedronGeometry(2.4, 0).translate(0, 4.4, 0);
+  const tmTrunk = new THREE.InstancedMesh(trunk, new THREE.MeshLambertMaterial({ color: 0x5a4330 }), trees.length);
+  const tmCrown = new THREE.InstancedMesh(crown, new THREE.MeshLambertMaterial({ color: 0x47622f, flatShading: true }), trees.length);
+  trees.forEach(([x, y, s], i) => { dummy.position.set(x, hBilOf(h79, x, y) - HBASE, -y); dummy.scale.setScalar(s); dummy.rotation.y = s * 9; dummy.updateMatrix(); tmTrunk.setMatrixAt(i, dummy.matrix); tmCrown.setMatrixAt(i, dummy.matrix); });
+  props = new THREE.Group(); props.add(colMesh, poleMesh, tmTrunk, tmCrown); model.add(props);
+  props.userData = { poleMesh, trees: [tmTrunk, tmCrown] };
+}
+
+// ---------------- People ----------------
+// Simple figures on the real streets. Each is six parts drawn as instances (body, head, two legs, two arms).
+const PEOPLE = { n: 0, agents: [], parts: null };
+const CLOTH = [0xb9ab8f, 0xa38f6e, 0x8c3b2a, 0xd8d0bd, 0x6e6a5c, 0x9a6b3c, 0x445a6e, 0xe9e4d8];
+const SKIN = [0x8d5a3b, 0xa86f4c, 0xc08a64, 0x7a4b31, 0xb57d58];
+let pathSegs = null;
+function initPeople(cx, cy, n, st0) {
+  removePeople();
+  if (!pathSegs) {           // street polylines in local metres, with each one's neighbours at the ends
+    pathSegs = town.paths.map(p => { const pts = p.map(([x, y]) => toLocal(x, y)); const len = []; let L = 0; for (let i = 0; i < pts.length - 1; i++) { len.push(L); L += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); } len.push(L); return { pts, cum: len, L, next0: [], next1: [] }; });
+    // routes across the Forum square, so it is busy too (random points inside the square, joined up)
+    { const fr = town.forum.map(([x, y]) => toLocal(x, y)); let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const [x, y] of fr) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const inR = (x, y) => { let c = false; for (let i = 0, j = fr.length - 1; i < fr.length; j = i++) { const [xi, yi] = fr[i], [xj, yj] = fr[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+      let seed = 7; const r01 = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let n = 0; n < 8; n++) { const pts = []; for (let t = 0; t < 60 && pts.length < 6; t++) { const x = x0 + r01() * (x1 - x0), y = y0 + r01() * (y1 - y0); if (inR(x, y)) pts.push([x, y]); }
+        if (pts.length < 2) continue; pts.push(pts[0]); const cum = []; let L = 0; for (let i = 0; i < pts.length - 1; i++) { cum.push(L); L += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); } cum.push(L);
+        pathSegs.push({ pts, cum, L, next0: [], next1: [], loop: true }); } }
+    const ends = (s, e) => e ? s.pts[s.pts.length - 1] : s.pts[0];
+    pathSegs.forEach((a, i) => { for (const ea of [0, 1]) { const pa = ends(a, ea); pathSegs.forEach((b, j) => { if (i === j) return; for (const eb of [0, 1]) if (Math.hypot(...[0, 1].map(q => ends(b, eb)[q] - pa[q])) < 18) (ea ? a.next1 : a.next0).push([j, eb]); }); } });
+  }
+  const near = []; pathSegs.forEach((s, i) => { const d = Math.min(...s.pts.map(p => Math.hypot(p[0] - cx, p[1] - cy))); if (d < 420) { near.push(i); if (d < 120) near.push(i, i, i); } });   // streets close to you get more people
+  if (!near.length) return;
+  const rnd01 = (() => { let s = 1234; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  const body = new THREE.CylinderGeometry(0.17, 0.26, 1, 8).translate(0, 0.5, 0), head = new THREE.SphereGeometry(0.11, 10, 8),
+    limb = new THREE.BoxGeometry(0.11, 1, 0.11).translate(0, -0.5, 0);
+  const mat = new THREE.MeshLambertMaterial();
+  const mkI = (g) => { const m = new THREE.InstancedMesh(g, mat, n); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; model.add(m); return m; };
+  const parts = { body: mkI(body), head: mkI(head), legL: mkI(limb), legR: mkI(limb), armL: mkI(limb), armR: mkI(limb) };
+  const col = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const seg = near[Math.floor(rnd01() * near.length)], s = pathSegs[seg];
+    const long = rnd01() < 0.3, child = rnd01() < 0.12, stay = rnd01() < 0.22;
+    const a = { seg, pos: rnd01() * s.L, dir: rnd01() < 0.5 ? 1 : -1, speed: 0.9 + rnd01() * 0.6, side: (rnd01() - 0.5) * 3, scale: child ? 0.65 : 0.92 + rnd01() * 0.16,
+      long, stay, phase: rnd01() * 10, look: rnd01(), leaveAt: rnd01(), gone: 0, x: 0, y: 0, yaw: 0 };
+    if (st0 && (st0.today || st0.pdcR > 0 || (st0.people >= 3 && a.leaveAt < st0.leave))) a.gone = 1;
+    PEOPLE.agents.push(a);
+    col.setHex(CLOTH[Math.floor(rnd01() * CLOTH.length)]); parts.body.setColorAt(i, col); parts.armL.setColorAt(i, col); parts.armR.setColorAt(i, col);
+    col.setHex(SKIN[Math.floor(rnd01() * SKIN.length)]); parts.head.setColorAt(i, col);
+    col.setHex(long ? CLOTH[Math.floor(rnd01() * CLOTH.length)] : SKIN[Math.floor(rnd01() * SKIN.length)]); parts.legL.setColorAt(i, col); parts.legR.setColorAt(i, col);
+  }
+  PEOPLE.n = n; PEOPLE.parts = parts;
+}
+function removePeople() { if (!PEOPLE.parts) return; const mats = new Set(); for (const m of Object.values(PEOPLE.parts)) { model.remove(m); m.geometry.dispose(); mats.add(m.material); m.dispose(); } mats.forEach(m => m.dispose()); PEOPLE.parts = null; PEOPLE.agents = []; PEOPLE.n = 0; }
+const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _m3 = new THREE.Matrix4(), _m4 = new THREE.Matrix4(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+function stepPeople(dt, st, now) {
+  if (!PEOPLE.parts) return;
+  const P = PEOPLE.parts, [vx, vy] = VENT;
+  for (let i = 0; i < PEOPLE.n; i++) {
+    const a = PEOPLE.agents[i], s = pathSegs[a.seg];
+    const leaving = st.people >= 3 && a.leaveAt < st.leave;
+    if (st.today || st.pdcR > 0 || fadeV > 0.02) a.gone = 1;   // no one in today's view, and no one once the current is coming
+    else if (leaving) a.gone = pb.playing ? Math.min(1, a.gone + dt / 4) : 1;
+    else if (st.people < 3 && st.leave === 0) a.gone = 0;
+    const looking = (st.people === 1 && a.look < 0.2) || (st.people === 2 && a.look < 0.85) || (st.people === 3 && !leaving && a.look < 0.6);
+    const sp = a.stay || looking ? 0 : (leaving ? 3.2 : a.speed);
+    a.pos += sp * dt * a.dir;
+    if (s.loop && (a.pos > s.L || a.pos < 0)) a.pos = (a.pos + s.L) % s.L;   // a loop across the Forum
+    else if (a.pos > s.L || a.pos < 0) {       // at the end of a street: carry on into a neighbouring one, or turn back
+      const opts = a.pos > s.L ? s.next1 : s.next0;
+      if (opts.length) { const [j, e] = opts[Math.floor((a.phase * 997 + now) % opts.length)]; a.seg = j; a.dir = e ? -1 : 1; a.pos = e ? pathSegs[j].L : 0; }
+      else { a.dir *= -1; a.pos = Math.max(0, Math.min(s.L, a.pos)); }
+    }
+    const S = pathSegs[a.seg]; let k = 0; while (k < S.cum.length - 2 && S.cum[k + 1] < a.pos) k++;
+    const p0 = S.pts[k], p1 = S.pts[k + 1], segL = Math.max(0.01, S.cum[k + 1] - S.cum[k]), t = Math.max(0, Math.min(1, (a.pos - S.cum[k]) / segL));
+    const dx = (p1[0] - p0[0]) / segL, dy = (p1[1] - p0[1]) / segL;
+    a.x = p0[0] + (p1[0] - p0[0]) * t - dy * a.side; a.y = p0[1] + (p1[1] - p0[1]) * t + dx * a.side;
+    const walkYaw = Math.atan2(dx * a.dir, dy * a.dir), lookYaw = Math.atan2(vx - a.x, vy - a.y);
+    const targetYaw = looking ? lookYaw : walkYaw; let dY = targetYaw - a.yaw; dY = Math.atan2(Math.sin(dY), Math.cos(dY)); a.yaw += dY * Math.min(1, dt * 4);
+    const z = groundAt(a.x, a.y), sc = a.scale * (1 - a.gone), swing = sp > 0 ? Math.sin(now / 1000 * 7 * (sp / 1.2) + a.phase) * Math.min(0.6, 0.35 * sp) : 0;
+    // body frame: position, facing (yaw is from north, clockwise; Three.js turns anticlockwise about +y)
+    _q2.setFromEuler(_e.set(0, -a.yaw + Math.PI, 0)); _p.set(a.x, z - HBASE, -a.y); _s.setScalar(Math.max(1e-4, sc));
+    _m.compose(_p, _q2, _s);
+    const put = (mesh, ox, oy, rotX, sy) => { _m2.makeRotationX(rotX); _m2.setPosition(ox, oy, 0); _m3.makeScale(1, sy, 1); _m4.multiplyMatrices(_m, _m2).multiply(_m3); mesh.setMatrixAt(i, _m4); };
+    put(P.body, 0, a.long ? 0.12 : 0.5, 0, a.long ? 1.33 : 0.95);
+    { _m2.makeRotationX(looking ? -0.35 : 0); _m2.setPosition(0, 1.58, 0); _m4.multiplyMatrices(_m, _m2); P.head.setMatrixAt(i, _m4); }
+    put(P.legL, -0.09, 0.52, swing, 0.52); put(P.legR, 0.09, 0.52, -swing, 0.52);
+    put(P.armL, -0.24, 1.42, looking && a.look < 0.15 ? -2.6 : -swing * 0.8, 0.58); put(P.armR, 0.24, 1.42, swing * 0.8, 0.58);
+  }
+  for (const m of Object.values(P)) m.instanceMatrix.needsUpdate = true;
+}
+
+// ---------------- Particles: eruption column, umbrella cloud, falling pumice, currents ----------------
+function makeParticles(n, frag, blending, parent) {
+  const base = new THREE.PlaneGeometry(1, 1), geo = new THREE.InstancedBufferGeometry();
+  geo.index = base.index; geo.setAttribute("position", base.attributes.position); geo.setAttribute("uv", base.attributes.uv);
+  const P = new Float32Array(n * 3), D = new Float32Array(n * 4);
+  const pa = new THREE.InstancedBufferAttribute(P, 3), da = new THREE.InstancedBufferAttribute(D, 4); pa.setUsage(THREE.DynamicDrawUsage); da.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("iPos", pa); geo.setAttribute("iData", da); geo.instanceCount = n;
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending, uniforms: { uS: { value: SCALE }, uLit: { value: 1 } },
+    vertexShader: `attribute vec3 iPos; attribute vec4 iData; uniform float uS; varying vec2 vUv; varying vec4 vD;
+      void main() { vUv = uv; vD = iData; vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
+        float s = iData.x * uS * length(modelMatrix[0].xyz); mv.xy += position.xy * s; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: frag });
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 5; (parent || table).add(mesh);
+  return { n, P, D, pa, da, mesh, next: 0, acc: 0,
+    x: new Float32Array(n), y: new Float32Array(n), z: new Float32Array(n), vx: new Float32Array(n), vy: new Float32Array(n), vz: new Float32Array(n),
+    age: new Float32Array(n).fill(1e9), life: new Float32Array(n), st: new Uint8Array(n), top: new Float32Array(n) };
+}
+const ASH_FRAG = `uniform float uLit; varying vec2 vUv; varying vec4 vD;
+  void main() { float r = length(vUv - 0.5) * 2.0; float a = smoothstep(1.0, 0.25, r) * vD.y; if (a < 0.01) discard;
+    vec3 c = mix(vec3(0.24, 0.22, 0.21), vec3(0.62, 0.60, 0.57), vUv.y * 0.6 + vD.w * 0.4);
+    c = mix(c, vec3(0.95, 0.94, 0.90), vD.z); gl_FragColor = vec4(c * uLit, a);
+    #include <colorspace_fragment>
+  }`;
+let colP = null, fallP = null, pdcP = null, localP = null;
+const VENT3 = [0, 0, 0];
+const rnd = (a, b) => a + Math.random() * (b - a);
+function kill(p, k) { p.age[k] = 1e9; p.D[k * 4 + 1] = 0; }
+function stepParticles(dt, st) {
+  const W2 = [Math.sin(st.windB * Math.PI / 180) * st.windV, Math.cos(st.windB * Math.PI / 180) * st.windV];
+  // the column: rises to its top, then spreads into the umbrella cloud and drifts downwind
+  const p = colP;
+  if (st.rate > 0 && toggles.ash) { p.acc += st.rate * dt; while (p.acc >= 1) { p.acc--; const k = p.next; p.next = (k + 1) % p.n;
+    const a = rnd(0, Math.PI * 2), r = rnd(0, st.small ? 120 : 400);
+    p.x[k] = VENT3[0] + Math.cos(a) * r; p.y[k] = VENT3[1] + Math.sin(a) * r; p.z[k] = VENT3[2] + 50;
+    p.vx[k] = rnd(-50, 50); p.vy[k] = rnd(-50, 50); p.vz[k] = st.top / rnd(2.0, 2.8); p.age[k] = 0; p.life[k] = rnd(10, 14); p.st[k] = 0; p.top[k] = st.top * rnd(0.82, 1.04);
+    p.D[k * 4 + 2] = st.grey ? 0.0 : 0.25; p.D[k * 4 + 3] = Math.random(); } }
+  for (let k = 0; k < p.n; k++) {
+    const o = k * 4; if (p.age[k] > p.life[k]) { p.D[o + 1] = 0; continue; }
+    p.age[k] += dt;
+    if (p.st[k] === 0 && p.z[k] >= VENT3[2] + p.top[k]) { p.st[k] = 1; const a = Math.atan2(p.y[k] - VENT3[1], p.x[k] - VENT3[0]) + rnd(-0.7, 0.7);
+      const sp = st.small ? rnd(150, 400) : rnd(1200, 2600); p.vx[k] = Math.cos(a) * sp; p.vy[k] = Math.sin(a) * sp; p.vz[k] = -rnd(0, 120); p.life[k] = p.age[k] + rnd(8, 12); }
+    if (p.st[k] === 1) { p.vx[k] += (W2[0] - p.vx[k]) * Math.min(1, dt * 0.35); p.vy[k] += (W2[1] - p.vy[k]) * Math.min(1, dt * 0.35); }
+    else { p.vx[k] += W2[0] * 0.05 * dt; p.vy[k] += W2[1] * 0.05 * dt; }
+    p.x[k] += p.vx[k] * dt; p.y[k] += p.vy[k] * dt; p.z[k] += p.vz[k] * dt;
+    if (p.x[k] < XMIN - 8000 || p.x[k] > XMAX + 8000 || p.y[k] < YMIN - 8000 || p.y[k] > YMAX + 8000 || p.z[k] < hBil(p.x[k], p.y[k])) { kill(p, k); continue; }
+    tpos(p.x[k], p.y[k], p.z[k], p.P, k * 3);
+    const f = p.age[k] / p.life[k], big = st.small ? 0.25 : 1;
+    p.D[o] = big * (p.st[k] === 0 ? 900 + 1100 * f : 3500 + 3000 * f);   // the umbrella: big, soft, overlapping puffs
+    p.D[o + 1] = Math.min(1, p.age[k] / 0.4) * (1 - Math.max(0, (f - 0.8) / 0.2)) * (p.st[k] === 0 ? 0.8 : 0.32);
+  }
+  p.pa.needsUpdate = true; p.da.needsUpdate = true;
+  // pumice falling out of the umbrella onto the land to the south-east (drawn as a grey curtain on the table)
+  const q = fallP;
+  if (st.patter && st.top > 10000 && toggles.ash) { q.acc += 260 * dt; while (q.acc >= 1) { q.acc--; const k = q.next; q.next = (k + 1) % q.n;
+    const along = rnd(2000, 26000), across = rnd(-1, 1) * along * 0.35, b = st.windB * Math.PI / 180;
+    q.x[k] = VENT3[0] + Math.sin(b) * along + Math.cos(b) * across; q.y[k] = VENT3[1] + Math.cos(b) * along - Math.sin(b) * across;
+    q.z[k] = rnd(12000, 18000); q.vz[k] = -rnd(1500, 2500); q.age[k] = 0; q.life[k] = 12; q.D[k * 4 + 3] = Math.random(); q.D[k * 4 + 2] = st.grey ? 0 : 0.5; } }
+  for (let k = 0; k < q.n; k++) { const o = k * 4; if (q.age[k] > q.life[k]) { q.D[o + 1] = 0; continue; }
+    q.age[k] += dt; q.z[k] += q.vz[k] * dt; if (q.z[k] < hBil(q.x[k], q.y[k]) + 100) { kill(q, k); continue; }
+    tpos(q.x[k], q.y[k], q.z[k], q.P, k * 3); q.D[o] = 2600; q.D[o + 1] = 0.07 * Math.min(1, q.age[k]); }
+  q.pa.needsUpdate = true; q.da.needsUpdate = true;
+  // currents: billowing clouds along the advancing front, hugging the ground
+  const c = pdcP;
+  const fronts = [];
+  if (st.hercR > 0 && st.hercR < 7500) fronts.push([st.hercR, HERC_SECTOR]);
+  if (st.pdcR > 0 && st.pdcR < 20000) fronts.push([st.pdcR, PDC_SECTOR]);
+  if (toggles.ash) for (const [R, sec] of fronts) { c.acc += 700 * dt; while (c.acc >= 1) { c.acc--; const k = c.next; c.next = (k + 1) % c.n;
+    let b = rnd(sec[0], sec[0] + ((sec[1] - sec[0] + 360) % 360)); const br = b * Math.PI / 180, r = R * rnd(0.75, 1.0);
+    c.x[k] = VENT3[0] + Math.sin(br) * r; c.y[k] = VENT3[1] + Math.cos(br) * r; c.z[k] = hBil(c.x[k], c.y[k]) + rnd(0, 500);
+    c.vx[k] = Math.sin(br) * rnd(100, 300); c.vy[k] = Math.cos(br) * rnd(100, 300); c.vz[k] = rnd(40, 160); c.age[k] = 0; c.life[k] = rnd(4, 7); c.D[k * 4 + 3] = Math.random(); c.D[k * 4 + 2] = 0; } }
+  for (let k = 0; k < c.n; k++) { const o = k * 4; if (c.age[k] > c.life[k]) { c.D[o + 1] = 0; continue; }
+    c.age[k] += dt; c.x[k] += c.vx[k] * dt; c.y[k] += c.vy[k] * dt; c.z[k] += c.vz[k] * dt;
+    tpos(c.x[k], c.y[k], c.z[k], c.P, k * 3); const f = c.age[k] / c.life[k]; c.D[o] = 500 + 900 * f; c.D[o + 1] = 0.75 * Math.min(1, c.age[k] / 0.3) * (1 - f); }
+  c.pa.needsUpdate = true; c.da.needsUpdate = true;
+}
+
+// ---------------- Life size: stand in the town ----------------
+const SPOTS = {
+  forum: { name: "the Forum", note: "You are standing in the Forum, looking north towards the mountain over the Temple of Jupiter." },
+  abbondanza: { name: "Via dell'Abbondanza", note: "You are standing on Via dell'Abbondanza, one of Pompeii's busiest streets. The mountain is to the north-west." }
+};
+const PATCH = 2400, PSTEP = 6, PATCH_Z = 17;
+let walk = null, patch = null, isAR = false;
+function headNow(out, dir) {
+  if (renderer.xr.isPresenting) { const cam = renderer.xr.getCamera(); cam.getWorldPosition(out); cam.getWorldDirection(dir); }
+  else { out.set(0, 1.7, 0); dir.set(0, 0, -1); }
+  dir.y = 0; if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1); dir.normalize();
+}
+function disposePatch() { if (!patch) return; model.remove(patch); patch.geometry.dispose(); patch.material.uniforms.uImg.value.dispose(); patch.material.dispose(); patch = null; }
+const cutIdx = {};
+function buildPatch(cx, cy) {
+  disposePatch();
+  const N = Math.round(PATCH / PSTEP) + 1, x0 = cx - PATCH / 2, y1 = cy + PATCH / 2;
+  const [lo0, la1] = utmToLL(x0 + E0, y1 + N0), [lo1, la0] = utmToLL(x0 + PATCH + E0, y1 - PATCH + N0);
+  const [ax, ay] = tileXY(lo0, la1, PATCH_Z), [bx, by] = tileXY(lo1, la0, PATCH_Z), tx0 = Math.floor(ax), ty0 = Math.floor(ay), tx1 = Math.floor(bx), ty1 = Math.floor(by);
+  const uvOf = (x, y) => { const [lon, lat] = utmToLL(x + E0, y + N0), [fx, fy] = tileXY(lon, lat, PATCH_Z); return [(fx - tx0) / (tx1 - tx0 + 1), (fy - ty0) / (ty1 - ty0 + 1)]; };
+  const { geo } = terrainGeometry(0, 0, N, N, PSTEP, { x0, y1 }, uvOf);
+  const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256;
+  const cxx = cv.getContext("2d");
+  { const src = imgInfo.canvas, [ux0, uy0] = imgInfo.uvOf(lo0, la1), [ux1, uy1] = imgInfo.uvOf(lo1, la0);   // coarse image first, sharper tiles as they arrive
+    cxx.drawImage(src, ux0 * src.width, uy0 * src.height, (ux1 - ux0) * src.width, (uy1 - uy0) * src.height, (ax - tx0) * 256, (ay - ty0) * 256, (bx - ax) * 256, (by - ay) * 256); }
+  const tex = new THREE.CanvasTexture(cv); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  patch = new THREE.Mesh(geo, groundMaterial(tex)); patch.frustumCulled = false; model.add(patch);
+  const me = patch;
+  patch.userData.load = () => { if (me.userData.loaded) return; me.userData.loaded = true;   // only fetched when "Today" is shown
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) loadImage(IMG_URL(PATCH_Z, ty, tx)).then(im => { if (patch !== me) return; cxx.drawImage(im, (tx - tx0) * 256, (ty - ty0) * 256); tex.needsUpdate = true; }).catch(() => {}); };
+  if (today) patch.userData.load();
+  // cut a hole in the table mesh under the patch so the two never fight
+  const inside = (k) => { const x = XMIN + (Math.min(W - 1, (k % RW) * RS) + 0.5) * CELL, y = YMAX - (Math.min(H - 1, ((k / RW) | 0) * RS) + 0.5) * CELL;
+    return Math.abs(x - cx) < PATCH / 2 - 80 && Math.abs(y - cy) < PATCH / 2 - 80; };
+  const key = cx.toFixed(0) + "," + cy.toFixed(0);
+  if (!cutIdx[key]) { const cut = []; for (let t = 0; t < baseIdx.array.length; t += 3) { const a = baseIdx.array[t], b = baseIdx.array[t + 1], c = baseIdx.array[t + 2]; if (!(inside(a) && inside(b) && inside(c))) cut.push(a, b, c); }
+    cutIdx[key] = new THREE.Uint32BufferAttribute(cut, 1); }
+  terrain.geometry.setIndex(cutIdx[key]);
+}
+function setExag(v) { exag = v; model.scale.y = SCALE * v; }
+async function enterWalk(id) {
+  if (!town || !town.spots[id]) return;
+  for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; }
+  const sp = town.spots[id], [sx, sy] = toLocal(...sp.xy); walk = { id, x: sx, y: sy, look: sp.look };
+  setExag(1); labels.visible = false; floor.visible = stand.visible = false;
+  buildPatch(sx, sy);
+  initPeople(sx, sy, renderer.xr.isPresenting ? 110 : 260, lastSt);
+  const F = (XMAX - XMIN) / TABLE_WIDTH, hd = new THREE.Vector3(), dir = new THREE.Vector3(); headNow(hd, dir);
+  const d = [walk.look[0], -walk.look[1]], th = Math.atan2(dir.x, dir.z) - Math.atan2(d[0], d[1]);   // face along the spot's view
+  table.scale.setScalar(F); table.rotation.set(0, th, 0);
+  const g = groundAt(sx, sy), local = new THREE.Vector3(sx * SCALE * F, (g - HBASE) * SCALE * F, -sy * SCALE * F).applyAxisAngle(new THREE.Vector3(0, 1, 0), th);
+  table.position.set(hd.x - local.x, -local.y, hd.z - local.z);
+  camera.near = 0.1; camera.far = 60000; camera.updateProjectionMatrix();
+  for (const p of [colP, fallP, pdcP]) p.mesh.material.uniforms.uS.value = SCALE;
+  if (!renderer.xr.isPresenting) { controls.minDistance = 0.5; controls.maxDistance = 40000; controls.maxPolarAngle = Math.PI * 0.95; table.updateMatrixWorld(true); townView(); }
+  LIGHT.uFogNear.value = 3000; LIGHT.uFogFar.value = 45000;
+  say(SPOTS[id].note); panelDirty = true; syncWalkButtons();
+}
+function leaveWalk() {
+  if (!walk) return; walk = null; removePeople();
+  disposePatch(); terrain.geometry.setIndex(baseIdx);
+  for (const p of [colP, fallP, pdcP]) p.mesh.material.uniforms.uLit.value = 1;
+  setExag(EXAG); labels.visible = toggles.names; localP.age.fill(1e9); localP.D.fill(0); localP.da.needsUpdate = true;
+  LIGHT.uFogNear.value = 1e9; LIGHT.uFogFar.value = 2e9; scene.fog = null; $("fade").style.opacity = 0; fadeMesh.visible = false;
+  camera.near = 0.01; camera.far = 50; camera.updateProjectionMatrix();
+  controls.minDistance = 0.12; controls.maxDistance = 4; controls.maxPolarAngle = Math.PI * 0.49;
+  if (renderer.xr.isPresenting) { scene.background = isAR ? null : bg; floor.visible = !isAR; placeAround(); }
+  else { stopMotion(); scene.background = bg; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); camera.position.set(0.0, 0.95, 1.65); controls.target.set(0.04, 0.28, 0.0); controls.update(); }
+  announce("Back to the table view."); panelDirty = true; syncWalkButtons();
+}
+// sky, light and falling pumice around you; the view fades as the current reaches you
+const SKY = new THREE.Color(0xa9c1d6), ASHSKY = new THREE.Color(0x2a2522), NIGHT = new THREE.Color(0x0b0d14), _sky = new THREE.Color();
+let fadeV = 0;
+function stepWalk(dt, st) {
+  const hUp = renderer.xr.isPresenting ? 0 : heightAboveGround(), up = sstep(1500, 2500, hUp);
+  const dark = Math.min(1, st.dark * 1.05), night = st.night;
+  _sky.copy(SKY).lerp(ASHSKY, dark).lerp(NIGHT, night * (1 - dark * 0.3)).lerp(bg, up);
+  if (!isAR || !renderer.xr.isPresenting) scene.background = _sky.clone();
+  const lvl = Math.max(0.16, (1 - 0.82 * dark) * (1 - 0.8 * night));
+  LIGHT.uAmb.value = 0.55 * lvl; LIGHT.uSunI.value = 0.75 * lvl * (1 - dark); hemi.intensity = 1.2 * lvl; sun.intensity = 1.5 * lvl * (1 - dark);
+  LIGHT.uFogC.value.copy(_sky); LIGHT.uFogNear.value = lerp(3000, 150, dark) + up * 2e5; LIGHT.uFogFar.value = lerp(45000, 2500, dark) + up * 4e5;
+  for (const p of [colP, fallP, pdcP]) p.mesh.material.uniforms.uLit.value = Math.max(0.25, 1 - 0.7 * night);
+  // the current: from about 600 m away the view fades to dark (the agreed ending: no one is shown dying)
+  const dWalk = Math.hypot(walk.x - VENT[0], walk.y - VENT[1]), inSec = inSector(bearing(walk.x - VENT[0], walk.y - VENT[1]), ...PDC_SECTOR);
+  const target = !st.today && inSec && st.pdcR > dWalk - 3000 ? 1 : 0;      // starts while the current is still about 3 km away
+  if (target && (!pb.playing || prefersReduced)) fadeV = 1;                  // when moving between moments, go straight to the fade
+  else fadeV += (target - fadeV) * Math.min(1, dt * 1.5);
+  if (st.today) fadeV = 0;
+  $("fade").style.opacity = renderer.xr.isPresenting ? 0 : (fadeV * 0.96).toFixed(3);
+  fadeMesh.visible = renderer.xr.isPresenting && fadeV > 0.01; fadeMesh.material.opacity = fadeV * 0.96;
+  // pumice falling around you
+  const p = localP;
+  if (pb.playing && st.patter && toggles.ash && fadeV < 0.9) { p.acc += 160 * fallAt(walk.x, walk.y) / 2.8 * dt * 10;
+    while (p.acc >= 1) { const k = p.next; p.next = (k + 1) % p.n; p.acc--;
+      const a = rnd(0, Math.PI * 2), r = Math.sqrt(Math.random()) * 30;
+      p.x[k] = walk.x + Math.cos(a) * r; p.y[k] = walk.y + Math.sin(a) * r; p.z[k] = groundAt(walk.x, walk.y) + rnd(6, 25);
+      p.vx[k] = rnd(-0.6, 0.6); p.vy[k] = rnd(-0.6, 0.6); p.vz[k] = -rnd(5, 9); p.age[k] = 0; p.life[k] = 6; p.D[k * 4 + 3] = Math.random(); p.D[k * 4 + 2] = st.grey ? 0.1 : 0.9; } }
+  for (let k = 0; k < p.n; k++) { const o = k * 4; if (p.age[k] > p.life[k]) { p.D[o + 1] = 0; continue; }
+    p.age[k] += dt; p.x[k] += p.vx[k] * dt; p.y[k] += p.vy[k] * dt; p.z[k] += p.vz[k] * dt;
+    if (p.z[k] < groundAt(p.x[k], p.y[k])) { kill(p, k); continue; }
+    tpos(p.x[k], p.y[k], p.z[k], p.P, k * 3); p.D[o] = 0.03 + 0.05 * p.D[o + 3]; p.D[o + 1] = 0.9; }
+  p.pa.needsUpdate = true; p.da.needsUpdate = true;
+}
+function syncWalkButtons() { for (const [b, k] of [["standF", "forum"], ["standA", "abbondanza"]]) $(b).setAttribute("aria-pressed", String(!!walk && walk.id === k)); $("standTable").disabled = !walk; }
+
+// ---------------- Place names ----------------
+const labels = new THREE.Group(); table.add(labels);
+function buildLabels() {
+  const list = PLACES.map(([n, E, N]) => [n, ...toLocal(E, N), 700]).concat([["Monte Somma (Vesuvius)", VENT[0], VENT[1], 1900]]);
+  for (const [name, x, y, up] of list) {
+    const cv = document.createElement("canvas"), cx = cv.getContext("2d"); cx.font = "600 44px system-ui, sans-serif";
+    const w = Math.ceil(cx.measureText(name).width) + 24; cv.width = w; cv.height = 64;
+    cx.font = "600 44px system-ui, sans-serif"; cx.fillStyle = "rgba(20,18,16,0.72)"; cx.beginPath(); cx.roundRect(0, 4, w, 56, 14); cx.fill();
+    cx.fillStyle = "#fff"; cx.fillText(name, 12, 47);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    const p = new Float32Array(3); tpos(x, y, hBil(x, y) + up, p, 0);
+    s.position.set(p[0], p[1], p[2]); s.scale.set(0.018 * w / 64, 0.018, 1); s.renderOrder = 10; labels.add(s);
+  }
+}
+
+// ---------------- Sound (made in the browser, no recordings) ----------------
+const snd = { ctx: null, on: false };
+function initSound() {
+  if (snd.ctx) { if (snd.ctx.state !== "running") snd.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const ctx = new AC(); snd.ctx = ctx;
+  const master = ctx.createGain(); master.gain.value = snd.on ? 0.9 : 0; master.connect(ctx.destination); snd.master = master;
+  const noise = (seconds, brown) => { const b = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate), d = b.getChannelData(0); let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; } return b; };
+  const panner = () => { const p = ctx.createPanner(); p.panningModel = "HRTF"; p.distanceModel = "inverse"; p.refDistance = 0.4; p.rolloffFactor = 1; p.connect(master); return p; };
+  snd.volcanoPan = panner();
+  const loop = (buf, type, freq, q, out) => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = ctx.createGain(); g.gain.value = 0;
+    s.connect(f); f.connect(g); g.connect(out); s.start(); return g; };
+  const brown = noise(4, true), white = noise(2, false);
+  snd.rumble = loop(brown, "lowpass", 110, 0.7, snd.volcanoPan);
+  snd.roar = loop(white, "bandpass", 380, 0.6, snd.volcanoPan);
+  snd.buf = white; snd.nextBoom = 0; snd.nextTick = 0;
+}
+function tick(ctx, t, gain) {   // a pumice stone landing
+  const s = ctx.createBufferSource(); s.buffer = snd.buf; const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = rnd(1500, 3500); f.Q.value = 3;
+  const g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + rnd(0.02, 0.06));
+  s.connect(f); f.connect(g); g.connect(snd.master); s.start(t, Math.random() * 1.5, 0.08);
+}
+function boom(ctx, t, gain) {
+  const s = ctx.createBufferSource(); s.buffer = snd.buf; const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+  s.connect(f); f.connect(g); g.connect(snd.volcanoPan); s.start(t, Math.random(), 2.3);
+}
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _f = new THREE.Vector3(), _u = new THREE.Vector3();
+function stepSound(st, playing) {
+  const ctx = snd.ctx; if (!ctx) return;
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera; cam.getWorldPosition(_v); cam.getWorldQuaternion(_q);
+  _f.set(0, 0, -1).applyQuaternion(_q); _u.set(0, 1, 0).applyQuaternion(_q); const L = ctx.listener;
+  if (L.positionX) { L.positionX.value = _v.x; L.positionY.value = _v.y; L.positionZ.value = _v.z; L.forwardX.value = _f.x; L.forwardY.value = _f.y; L.forwardZ.value = _f.z; L.upX.value = _u.x; L.upY.value = _u.y; L.upZ.value = _u.z; }
+  snd.volcanoPan.refDistance = 0.4 * table.scale.x;
+  const a = new Float32Array(3); tpos(VENT3[0], VENT3[1], VENT3[2], a, 0); _v.set(a[0], a[1], a[2]); table.localToWorld(_v);
+  snd.volcanoPan.positionX.value = _v.x; snd.volcanoPan.positionY.value = _v.y; snd.volcanoPan.positionZ.value = _v.z;
+  const t = ctx.currentTime, k = playing && fadeV < 0.9 ? 1 : 0;
+  snd.rumble.gain.setTargetAtTime(k * st.rumble, t, 0.3); snd.roar.gain.setTargetAtTime(k * st.roar, t, 0.3);
+  if (k && st.booms > 0 && t > snd.nextBoom) { boom(ctx, t + 0.02, 0.9 * st.booms); snd.nextBoom = t + rnd(1.0, 3.0) / st.booms; }
+  if (k && walk && st.patter && t > snd.nextTick) { tick(ctx, t + 0.01, 0.12); snd.nextTick = t + rnd(0.01, 0.07); }
+}
+
+// ---------------- Playback and the story ----------------
+const pb = { sec: 0, playing: false, last: 0 };
+let lastSt = null;
+const story = { cur: -1, m: null, mode: "intro", hold: 0, stopSec: PLAY_S, finished: false };
+const prefersReduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function setPlaying(v) { pb.playing = v; if (v) initSound(); syncPlay(); panelDirty = true; }
+function clearAll() { for (const p of [colP, fallP, pdcP, localP]) if (p) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } fadeV = 0; }
+function setToday(v) {
+  if (today === v) return; today = v; SHARED.uToday.value = v ? 1 : 0;
+  if (v) { clearAll(); imgInfo.done.then(n => { if (!n) say("Today's satellite image couldn't load, so the ground is shown without it."); }); if (patch && patch.userData.load) patch.userData.load(); }
+  if (props) { props.userData.poleMesh.visible = !v; }
+}
+function stepPlayback(now) {
+  const dt = Math.min(0.05, (now - (pb.last || now)) / 1000); pb.last = now;
+  if (!town) return;
+  if (pb.playing) {
+    if (story.hold > 0) story.hold -= dt;
+    else pb.sec = Math.min(story.stopSec, pb.sec + dt);
+    if (story.mode === "watch" && story.hold <= 0) { const i = momentAtSec(pb.sec); if (i !== story.cur) setMomentInfo(i); }
+    if (pb.sec >= story.stopSec) { setPlaying(false); if (story.mode === "watch") finishStory(); else { story.mode = "browse"; syncPlay(); } } }
+  const showToday = story.m && story.m.today && !pb.playing;
+  const before = story.mode === "intro" || (story.mode === "watch" && story.hold > 0);
+  const h = before ? MOMENTS[0].h0 : hoursAt(pb.sec), st = stateAt(h, showToday); lastSt = st;
+  setToday(!!showToday);
+  curFall = st.today ? 0 : st.fall;
+  SHARED.uFall.value = curFall; SHARED.uGrey.value = st.grey; SHARED.uHercR.value = st.hercR; SHARED.uPdcR.value = st.pdcR; LIGHT.uDark.value = walk ? 0 : st.dark;
+  if (walk) stepWalk(dt, st); else { LIGHT.uAmb.value = 0.55; LIGHT.uSunI.value = 0.75; hemi.intensity = 1.2; sun.intensity = 1.5; }
+  stepParticles(dt, st);
+  stepPeople(dt, st, now);
+  stepSound(st, pb.playing && snd.on);
+  const date = showToday ? "Today" : fmtTime(h); if (date !== panelDate) { panelDate = date; $("date").textContent = date; panelDirty = true; }
+}
+function momentAtSec(sec) { let s = 0; for (let i = 0; i < SEG.length; i++) { s += SEG[i].dur; if (sec < s) return i; } return SEG.length - 1; }
+function playLabel() {
+  if (pb.playing) return "Pause";
+  if (story.mode === "paused" || story.mode === "partPaused") return "Keep watching";
+  if (story.mode === "browse" && story.m && story.m.dur) return "Replay this part";
+  return story.finished ? "Watch it all again" : "Watch the eruption";
+}
+function syncPlay() { $("play").disabled = !town; $("play").innerHTML = `<span aria-hidden="true">${pb.playing ? "❚❚ " : "▶ "}</span>` + playLabel(); $("watchAll").hidden = !story.finished || story.mode === "watch"; }
+function setMomentInfo(i, quiet) {
+  const m = MOMENTS[i]; if (!m) return; story.cur = i; story.m = m; lastSaid = "";
+  $("mWhen").textContent = `${i + 1} of ${MOMENTS.length} · ${m.when}`; $("mTitle").textContent = m.title; $("mText").textContent = m.text;
+  $("back").disabled = i === 0; $("next").disabled = i === MOMENTS.length - 1;
+  if (!quiet) announce(`Moment ${i + 1} of ${MOMENTS.length}, ${m.when}. ${m.title}. ${m.text}`);
+  panelStory = { head: `${i + 1} OF ${MOMENTS.length} · ${m.when.toUpperCase()}`, title: m.title, text: m.text };
+  panelDirty = true; syncPlay();
+}
+function finishStory() {
+  story.finished = true; story.mode = "browse"; setMomentInfo(MOMENTS.length - 1, true); pb.sec = PLAY_S;
+  const m = MOMENTS[MOMENTS.length - 1];
+  info("<b>That was the whole eruption.</b> Use Back and Next to look at each moment again, and replay any part.");
+  announce(`Moment ${MOMENTS.length} of ${MOMENTS.length}, ${m.when}. ${m.title}. ${m.text} That was the whole eruption. Use Back and Next to look at each moment again, and replay any part.`);
+  $("back").classList.add("pulse"); syncPlay();
+}
+function showMoment(i) {
+  if (i < 0 || i >= MOMENTS.length) return;
+  const m = MOMENTS[i]; setPlaying(false); story.mode = "browse"; story.hold = 0;
+  pb.sec = m.today ? PLAY_S : i === 0 ? 0 : Math.max(secAt(m.h0), secAt(m.h1) - 0.05); clearAll();
+  $("back").classList.remove("pulse"); info(""); setMomentInfo(i);
+}
+function watchAll() {
+  $("play").classList.remove("pulse"); $("back").classList.remove("pulse"); info("");
+  story.mode = "watch"; story.hold = 3; pb.sec = 0; story.stopSec = PLAY_S; clearAll(); setMomentInfo(0); setPlaying(true);
+}
+$("play").onclick = () => {
+  if (pb.playing) { setPlaying(false); if (story.mode === "watch") story.mode = "paused"; else if (story.mode === "part") story.mode = "partPaused"; syncPlay(); return; }
+  if (story.mode === "paused") { story.mode = "watch"; setPlaying(true); return; }
+  if (story.mode === "partPaused") { story.mode = "part"; setPlaying(true); return; }
+  if (story.mode === "browse" && story.m && story.m.dur) { story.mode = "part"; pb.sec = secAt(story.m.h0); story.stopSec = secAt(story.m.h1); story.hold = 0; clearAll(); setPlaying(true); return; }
+  watchAll();
+};
+$("next").onclick = () => showMoment(story.cur + 1);
+$("back").onclick = () => showMoment(story.cur - 1);
+$("watchAll").onclick = () => watchAll();
+const toggles = { sound: false, ash: true, names: true };
+function setToggle(k, v) { toggles[k] = v; const btn = { sound: "sound", ash: "ashBtn", names: "names" }[k]; $(btn).setAttribute("aria-pressed", String(v));
+  if (k === "sound") { snd.on = v; if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); }
+  if (k === "ash") for (const p of [colP, fallP, pdcP, localP]) if (p) p.mesh.visible = v;
+  if (k === "names") labels.visible = v && !walk;
+  panelDirty = true; }
+$("sound").onclick = () => setToggle("sound", !toggles.sound);
+$("ashBtn").onclick = () => setToggle("ash", !toggles.ash);
+$("names").onclick = () => setToggle("names", !toggles.names);
+$("standF").onclick = () => { initSound(); if (walk && walk.id === "forum") leaveWalk(); else enterWalk("forum"); };          // pressing again goes back to the table
+$("standA").onclick = () => { initSound(); if (walk && walk.id === "abbondanza") leaveWalk(); else enterWalk("abbondanza"); };
+$("standTable").onclick = () => leaveWalk();
+
+// Keyboard control of the model (only while it has focus)
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+function orbitBy(dTheta, dPhi) { _off.copy(camera.position).sub(controls.target); _sph.setFromVector3(_off);
+  _sph.theta += dTheta; _sph.phi = Math.max(controls.minPolarAngle + 0.01, Math.min(controls.maxPolarAngle, _sph.phi + dPhi));
+  _off.setFromSpherical(_sph); camera.position.copy(controls.target).add(_off); controls.update(); }
+const _tl = new Float32Array(3), _cp = new THREE.Vector3();
+function worldOf(x, y, z) { tpos(x, y, z, _tl, 0); return table.localToWorld(new THREE.Vector3(_tl[0], _tl[1], _tl[2])); }
+function stopMotion() { const d = controls.enableDamping; controls.enableDamping = false; controls.update(); controls.enableDamping = d; }
+function townView() {   // eye level, looking along the spot's view (up the Forum, or along the street)
+  stopMotion();
+  const [dx, dy] = walk.look, tx = walk.x + dx * 60, ty = walk.y + dy * 60;
+  camera.position.copy(worldOf(walk.x, walk.y, groundAt(walk.x, walk.y) + 1.7)); controls.target.copy(worldOf(tx, ty, groundAt(tx, ty) + 4)); controls.update();
+}
+function heightAboveGround() { _cp.copy(camera.position); table.worldToLocal(_cp);
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, z = _cp.y / (SCALE * exag) + HBASE;
+  return z - (x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX ? groundAt(x, y) : 0); }
+function keepAboveGround() { _cp.copy(camera.position); table.worldToLocal(_cp);
+  const x = _cp.x / SCALE, y = -_cp.z / SCALE, inside = x >= XMIN && x <= XMAX && y >= YMIN && y <= YMAX;
+  const minY = ((inside ? groundAt(x, y) : 0) + 1.6 - HBASE) * SCALE * exag; if (_cp.y >= minY) return;
+  _cp.y = minY; table.localToWorld(_cp); camera.position.y = _cp.y; }
+function zoomBy(f) { _off.copy(camera.position).sub(controls.target); const d = Math.max(controls.minDistance, Math.min(controls.maxDistance, _off.length() * f));
+  _off.setLength(d); camera.position.copy(controls.target).add(_off); controls.update(); }
+canvas.addEventListener("keydown", (e) => {
+  if (renderer.xr.isPresenting) return;
+  const step = Math.PI / 24, k = e.key;
+  if (k === "ArrowLeft") orbitBy(-step, 0); else if (k === "ArrowRight") orbitBy(step, 0);
+  else if (k === "ArrowUp") orbitBy(0, -step); else if (k === "ArrowDown") orbitBy(0, step);
+  else if (k === "+" || k === "=") zoomBy(0.85); else if (k === "-" || k === "_") zoomBy(1 / 0.85);
+  else if (k === "Home") { if (walk) townView(); else { stopMotion(); camera.position.set(0.0, 0.95, 1.65); controls.target.set(0.04, 0.28, 0.0); } controls.update(); }
+  else return;
+  e.preventDefault();
+});
+
+// ---------------- WebXR ----------------
+const xrBox = $("xr");
+if (navigator.xr) (async () => {
+  const opts = { requiredFeatures: ["local-floor"], optionalFeatures: ["hand-tracking"] };
+  const [arOK, vrOK] = await Promise.all(["immersive-ar", "immersive-vr"].map(m => navigator.xr.isSessionSupported(m).catch(() => false)));
+  const label = (btn, text) => { const f = () => { const s = btn.textContent; if ((s === "START AR" || s === "ENTER VR") && s !== text) btn.textContent = text; };
+    new MutationObserver(f).observe(btn, { childList: true, characterData: true, subtree: true }); f(); };
+  if (arOK) { const ar = ARButton.createButton(renderer, opts); xrBox.append(ar); label(ar, "View on your table"); ar.addEventListener("click", initSound); }
+  if (vrOK) { const vr = VRButton.createButton(renderer, opts); xrBox.append(vr); label(vr, "Enter VR"); vr.addEventListener("click", initSound); }
+  if (arOK || vrOK) $("howTo").textContent = "Press \"View on your table\" to put the model on a real table, or \"Enter VR\".";
+})();
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 48).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a362f }));
+floor.visible = false; scene.add(floor);
+const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.72, 48), new THREE.MeshLambertMaterial({ color: 0x4a443a }));
+stand.visible = false; scene.add(stand);
+// in the headset the fade is a dark sphere around your head
+const fadeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x1a1714, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false, fog: false }));
+fadeMesh.renderOrder = 100; fadeMesh.visible = false; camera.add(fadeMesh);
+renderer.xr.addEventListener("sessionstart", () => {
+  if (walk) leaveWalk();
+  const ar = renderer.xr.getSession().environmentBlendMode && renderer.xr.getSession().environmentBlendMode !== "opaque";
+  isAR = !!ar; scene.background = ar ? null : bg; floor.visible = !ar; stand.visible = !ar;
+  needPlace = true; panel.visible = true; initSound();
+});
+renderer.xr.addEventListener("sessionend", () => {
+  if (walk) leaveWalk();
+  scene.background = bg; floor.visible = stand.visible = false; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); panel.visible = false;
+  stopMotion(); camera.position.set(0.0, 0.95, 1.65); controls.target.set(0.04, 0.28, 0.0); controls.update();
+});
+
+// Floating 3D menu in the headset
+const PW = 1024, PH = 1800, panelCanvas = document.createElement("canvas"); panelCanvas.width = PW; panelCanvas.height = PH;
+const pctx = panelCanvas.getContext("2d"), panelTex = new THREE.CanvasTexture(panelCanvas); panelTex.colorSpace = THREE.SRGBColorSpace;
+const PANEL_W = 0.34;
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(PANEL_W, PANEL_W * PH / PW), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true, fog: false }));
+panel.visible = false; scene.add(panel);
+let hover = -1;
+const BTN = [];
+const addBtn = (id, label, x, y, w, h) => BTN.push({ id, label, x, y, w, h });
+addBtn("back", "Back", 40, 150, 260, 120); addBtn("play", "", 320, 150, 384, 120); addBtn("next", "Next", 724, 150, 260, 120);
+addBtn("timeline", "", 40, 290, 944, 70);
+addBtn("sound", "Sound", 40, 380, 300, 90); addBtn("ash", "Cloud", 362, 380, 300, 90); addBtn("names", "Names", 684, 380, 300, 90);
+addBtn("smaller", "Smaller", 40, 490, 300, 90); addBtn("bigger", "Bigger", 362, 490, 300, 90); addBtn("rotate", "Turn", 684, 490, 300, 90);
+addBtn("forum", "In the Forum", 40, 600, 300, 80); addBtn("abbondanza", "Via dell'Abbondanza", 362, 600, 360, 80); addBtn("tbl", "Table", 744, 600, 240, 80);
+addBtn("reset", "Reset table", 40, 700, 944, 80);
+function drawPanel() {
+  pctx.clearRect(0, 0, PW, PH);
+  pctx.fillStyle = "rgba(255,253,248,0.95)"; roundRect(0, 0, PW, PH, 40); pctx.fill();
+  pctx.fillStyle = "#22201c"; pctx.font = "bold 56px system-ui, sans-serif"; pctx.fillText("Pompeii, AD 79", 40, 95);
+  pctx.fillStyle = "#6b665c"; pctx.font = "30px system-ui, sans-serif"; const vt = "Version " + VERSION; pctx.fillText(vt, PW - 40 - pctx.measureText(vt).width, 95);
+  pctx.fillStyle = "#6b665c"; pctx.font = "600 24px system-ui, sans-serif"; pctx.fillText(CREDIT_TAG, PW - 40 - pctx.measureText(CREDIT_TAG).width, 130);
+  for (let b = 0; b < BTN.length; b++) {
+    const B = BTN[b]; let label = B.label, on = true;
+    if (B.id === "timeline") { pctx.fillStyle = b === hover && !pb.playing ? "#e2d9c7" : "#efe9dd"; roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+      pctx.fillStyle = "#b4381c"; roundRect(B.x, B.y, Math.max(40, B.w * pb.sec / PLAY_S), B.h, 20); pctx.fill();
+      pctx.fillStyle = "#22201c"; pctx.font = "600 34px system-ui, sans-serif";
+      pctx.fillText(story.finished && !pb.playing ? "Watch the whole eruption again" : panelDate || "", B.x + 24, B.y + 48); continue; }
+    if (B.id === "play") label = playLabel();
+    if (B.id === "next") on = story.cur < MOMENTS.length - 1;
+    if (B.id === "back") on = story.cur > 0;
+    if (["sound", "ash", "names"].includes(B.id)) on = toggles[B.id];
+    if (["smaller", "bigger", "rotate", "reset"].includes(B.id)) on = !walk;
+    if (B.id === "tbl") on = !!walk;
+    if (B.id === "forum" || B.id === "abbondanza") on = !walk || walk.id !== B.id;
+    const strong = B.id === "back" && story.finished && story.mode === "browse" && story.cur === MOMENTS.length - 1;
+    pctx.fillStyle = (B.id === "play" || strong) ? (b === hover ? "#9b2f16" : "#b4381c") : (b === hover ? "#e2d9c7" : "#efe9dd"); roundRect(B.x, B.y, B.w, B.h, 20); pctx.fill();
+    pctx.globalAlpha = on ? 1 : 0.45; pctx.fillStyle = (B.id === "play" || strong) ? "#fff" : "#22201c"; pctx.font = "600 44px system-ui, sans-serif";
+    if (pctx.measureText(label).width > B.w - 40) pctx.font = "600 32px system-ui, sans-serif";
+    pctx.fillText(label, B.x + 24, B.y + B.h / 2 + 13); pctx.globalAlpha = 1;
+  }
+  let y = 850;
+  if (panelStory) { const S = panelStory;
+    pctx.fillStyle = "#b4381c"; pctx.font = "bold 28px system-ui, sans-serif"; pctx.fillText(S.head, 40, y); y += 56;
+    pctx.fillStyle = "#22201c"; pctx.font = "bold 46px system-ui, sans-serif"; y = wrap(S.title, 40, y, PW - 80, 54) + 52;
+    pctx.font = "32px system-ui, sans-serif"; y = wrap(S.text, 40, y, PW - 80, 42) + 52; }
+  if (panelInfo) { pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; wrap(panelInfo, 40, Math.min(y, PH - 150), PW - 80, 34); }
+  pctx.fillStyle = "#6b665c"; pctx.font = "28px system-ui, sans-serif"; pctx.fillText("Point and pull the trigger (or pinch) to choose. Grip to move the table.", 40, PH - 30);
+  pctx.fillStyle = "#6b665c"; pctx.font = "26px system-ui, sans-serif"; pctx.fillText(`On the table the ground is ×${EXAG} higher; in the town it is true height.`, 40, PH - 72);
+  panelTex.needsUpdate = true; panelDirty = false;
+}
+function roundRect(x, y, w, h, r) { pctx.beginPath(); pctx.moveTo(x + r, y); pctx.arcTo(x + w, y, x + w, y + h, r); pctx.arcTo(x + w, y + h, x, y + h, r); pctx.arcTo(x, y + h, x, y, r); pctx.arcTo(x, y, x + w, y, r); pctx.closePath(); }
+function wrap(text, x, y, maxW, lh) { const words = text.split(/\s+/); let line = "", yy = y; for (const w of words) { const t = line ? line + " " + w : w; if (pctx.measureText(t).width > maxW) { pctx.fillText(line, x, yy); line = w; yy += lh; } else line = t; } if (line) pctx.fillText(line, x, yy); return yy; }
+let needPlace = false;
+const head = new THREE.Vector3(), fwd = new THREE.Vector3();
+function placeAround() {
+  const cam = renderer.xr.getCamera(); cam.getWorldPosition(head); cam.getWorldDirection(fwd);
+  fwd.y = 0; if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+  const yaw = Math.atan2(-fwd.x, -fwd.z), side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const ty = head.y > 0.9 ? head.y - 0.8 : head.y - 0.55;
+  table.position.set(head.x + fwd.x * 0.75, ty, head.z + fwd.z * 0.75); table.rotation.set(0, yaw, 0); table.scale.setScalar(1);
+  const sh = Math.max(0.05, ty - 0.02); stand.scale.set(1, sh / 0.72, 1); stand.position.set(table.position.x, sh / 2, table.position.z); stand.rotation.y = yaw;
+  stand.visible = floor.visible && ty > 0.3;
+  panel.position.set(head.x + fwd.x * 0.6 - side.x * 0.8, head.y - 0.25, head.z + fwd.z * 0.6 - side.z * 0.8); panel.lookAt(head.x, head.y - 0.1, head.z);
+  panelDirty = true; needPlace = false;
+}
+function pressButton(id) {
+  if (id === "play") $("play").onclick();
+  else if (id === "next") showMoment(story.cur + 1);
+  else if (id === "back") showMoment(story.cur - 1);
+  else if (id === "timeline") { if (story.finished && !pb.playing) watchAll(); }
+  else if (id === "sound" || id === "ash" || id === "names") setToggle(id, !toggles[id]);
+  else if (id === "forum" || id === "abbondanza") enterWalk(id);
+  else if (id === "tbl") leaveWalk();
+  else if (walk && ["smaller", "bigger", "rotate", "reset"].includes(id)) return;
+  else if (id === "smaller") table.scale.multiplyScalar(0.8);
+  else if (id === "bigger") table.scale.multiplyScalar(1.25);
+  else if (id === "rotate") table.rotateY(Math.PI / 4);
+  else if (id === "reset") { for (const c of ctrls) if (c.userData.holding) { scene.attach(table); c.userData.holding = false; } placeAround(); }
+  panelDirty = true;
+}
+const raycaster = new THREE.Raycaster(), tmpM = new THREE.Matrix4();
+const cmf = new XRControllerModelFactory(), hmf = new XRHandModelFactory();
+const ctrls = [0, 1].map(i => {
+  const c = renderer.xr.getController(i); scene.add(c);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffffff }));
+  line.scale.z = 2; c.add(line);
+  const grip = renderer.xr.getControllerGrip(i); grip.add(cmf.createControllerModel(grip)); scene.add(grip);
+  const hand = renderer.xr.getHand(i); hand.add(hmf.createHandModel(hand, "spheres")); scene.add(hand);
+  c.addEventListener("select", () => { const h = hitButton(c); if (h) pressButton(BTN[h.b].id); });
+  c.addEventListener("squeezestart", () => { if (walk) return; stand.visible = false; c.attach(table); c.userData.holding = true; });
+  c.addEventListener("squeezeend", () => { if (!c.userData.holding) return; scene.attach(table); c.userData.holding = false; });
+  return c;
+});
+function hitButton(c) {
+  if (!panel.visible) return null;
+  tmpM.identity().extractRotation(c.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld); raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
+  const hit = raycaster.intersectObject(panel)[0]; if (!hit || !hit.uv) return null;
+  const x = hit.uv.x * PW, y = (1 - hit.uv.y) * PH;
+  const b = BTN.findIndex(B => x >= B.x && x <= B.x + B.w && y >= B.y && y <= B.y + B.h);
+  return b >= 0 ? { b } : null;
+}
+
+// ---------------- Render loop ----------------
+let frames = 0, frameMs = 0;
+renderer.setAnimationLoop(() => {
+  const now = performance.now();
+  stepPlayback(now);
+  if (renderer.xr.isPresenting) {
+    if (needPlace) placeAround();
+    let hv = -1; for (const c of ctrls) { const h = hitButton(c); if (h) hv = h.b; }
+    if (hv !== hover) { hover = hv; panelDirty = true; }
+    if (panelDirty || (pb.playing && frames % 10 === 0)) drawPanel();
+  } else { controls.update(); if (walk) keepAboveGround(); }
+  renderer.render(scene, camera);
+  frames++; frameMs += performance.now() - now;
+});
+
+// ---------------- Load ----------------
+(async () => {
+  try {
+    info("Loading the landscape…");
+    const meta = await (await fetch(DATA.meta)).json();
+    W = meta.width; H = meta.height; CELL = meta.cell_m;
+    const [L, B, R, T] = meta.bounds_utm; E0 = (L + R) / 2; N0 = (B + T) / 2;
+    XMIN = L - E0; XMAX = R - E0; YMIN = B - N0; YMAX = T - N0;
+    SCALE = TABLE_WIDTH / (XMAX - XMIN); model.scale.set(SCALE, SCALE * EXAG, SCALE);
+    VENT = toLocal(...VENT_UTM); SHARED.uVent.value.set(VENT[0], VENT[1]);
+    const maxTex = renderer.capabilities.maxTextureSize;
+    const [a, b, t] = await Promise.all([loadHeights(DATA.h79), loadHeights(DATA.hNow), fetch(DATA.town).then(r => r.json())]);
+    h79 = a; hNow = b; town = t;
+    imgInfo = await loadImagery(meta.bounds_lonlat, Math.min(maxTex, 8192));
+    info("Building the town…");
+    buildTerrain(); buildTownGround(); buildTown(); buildLabels();
+    let top = 0; for (let dj = -15; dj <= 15; dj++) for (let di = -15; di <= 15; di++) top = Math.max(top, hBilOf(h79, VENT[0] + di * CELL, VENT[1] + dj * CELL));
+    VENT3[0] = VENT[0]; VENT3[1] = VENT[1]; VENT3[2] = top - 60;   // the vent sits in the caldera floor
+    colP = makeParticles(5000, ASH_FRAG, THREE.NormalBlending); colP.mesh.renderOrder = 6;
+    fallP = makeParticles(2500, ASH_FRAG, THREE.NormalBlending); fallP.mesh.renderOrder = 5;
+    pdcP = makeParticles(3000, ASH_FRAG, THREE.NormalBlending); pdcP.mesh.renderOrder = 7;
+    localP = makeParticles(1500, ASH_FRAG, THREE.NormalBlending); localP.mesh.renderOrder = 8;
+    $("credits").textContent = `Terrain: Copernicus GLO-30, © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA; all rights reserved. The AD 79 terrain is a reconstruction made from it. Town: streets, wall and public buildings © OpenStreetMap contributors (ODbL); houses generated. Today's image: Esri World Imagery. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Code: three.js (MIT licence). Version ${VERSION}`;
+    for (const id of ["standF", "standA"]) $(id).disabled = !(id === "standF" ? town.spots.forum : town.spots.abbondanza);
+    info(""); setMomentInfo(0); story.mode = "intro"; $("play").classList.add("pulse"); syncPlay();
+    panelDate = fmtTime(MOMENTS[0].h0); $("date").textContent = panelDate;
+    console.info("Pompeii 79", VERSIONS, { grid: [W, H], cell: CELL, lots: town.lots.length, imageryZoom: imgInfo.zoom });
+  } catch (e) { console.error(e); say("Couldn't load the model data. Check your connection and reload."); }
+})();
+// Test hooks (used by automated tests; harmless otherwise)
+window.__pom = { showMoment, story, pb, stateAt, hoursAt, PLAY_S, enterWalk, leaveWalk, get walk() { return walk; }, camera, controls, renderer, scene, table,
+  drawPanel, BTN, fallAt, get VENT() { return VENT; }, toLocal, get town() { return town; }, PEOPLE, perf() { return { frames, avgMs: frames ? frameMs / frames : 0 }; },
+  simulate(sec) { const st = stateAt(hoursAt(pb.sec)); for (let t = 0; t < sec; t += 1 / 30) { stepParticles(1 / 30, st); stepPeople(1 / 30, st, performance.now() + t * 1000); if (walk) stepWalk(1 / 30, st); } } };
+</script>
+</body>
+</html>
