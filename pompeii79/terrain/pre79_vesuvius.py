@@ -36,7 +36,8 @@ PARAMS = {
     "profile_max_m": 5000,
     "moat_search_m": [600, 3000],        # where the inner moat (Atrio del Cavallo) can be
     "rim_search_max_m": 4500,
-    "min_wall_height_m": 60,             # crest minus moat floor needed to count as a rim
+    "min_wall_height_m": 60,
+    "profile_smooth_m": 150,             # smooth profiles (trees/buildings in surface models)             # crest minus moat floor needed to count as a rim
     "edge_blend_deg": 6,                # azimuth ramp where the rebuilt rim meets the real one
     "outer_flank_m": 2500,               # rebuilt outer flank length before it meets today's slope
     "floor_smooth_m": 120,
@@ -126,16 +127,39 @@ def reconstruct(dem, transform, p=PARAMS, log=print):
     for i, a in enumerate(np.radians(az)):
         px, py = cx + r * np.sin(a), cy + r * np.cos(a)        # azimuth from north, clockwise
         z = sample(dem, transform, px, py)
-        m = (r >= p["moat_search_m"][0]) & (r <= p["moat_search_m"][1])
-        im = np.flatnonzero(m)[np.nanargmin(z[m])]
-        beyond = (r > r[im]) & (r <= p["rim_search_max_m"])
-        if not beyond.any():
+        # Walk outward from the cone: the rim is where the profile first climbs
+        # min_wall_height above the lowest point passed so far (the moat).
+        z = ndimage.uniform_filter1d(z, max(1, int(p["profile_smooth_m"] / res)))
+        start = np.searchsorted(r, p["moat_search_m"][0])
+        stop = np.searchsorted(r, p["rim_search_max_m"])
+        seg = z[start:stop]
+        runmin = np.minimum.accumulate(seg)
+        rise = seg - runmin
+        hit = np.flatnonzero(rise >= p["min_wall_height_m"])
+        if not hit.size:
             continue
-        ic = np.flatnonzero(beyond)[np.nanargmax(z[beyond])]
-        if z[ic] - z[im] >= p["min_wall_height_m"] and ic < np.flatnonzero(beyond)[-1]:
-            moat_r[i], moat_z[i], crest_r[i], crest_z[i] = r[im], z[im], r[ic], z[ic]
+        h0 = hit[0]
+        im = start + int(np.argmin(seg[:h0 + 1]))
+        if r[im] > p["moat_search_m"][1]:
+            continue
+        # crest: keep climbing until the profile falls clearly below its highest point
+        top = h0
+        for j in range(h0, seg.size):
+            if seg[j] > seg[top]:
+                top = j
+            elif seg[top] - seg[j] > p["min_wall_height_m"]:
+                break
+        else:
+            continue  # still climbing at the search limit: not a rim
+        ic = start + top
+        moat_r[i], moat_z[i], crest_r[i], crest_z[i] = r[im], z[im], r[ic], z[ic]
     rim = ~np.isnan(crest_r)
     if rim.sum() < 10:
+        for a_deg in (330, 0, 30):          # help diagnose: print a few profiles
+            a = np.radians(a_deg)
+            zz = sample(dem, transform, cx + r * np.sin(a), cy + r * np.cos(a))
+            k = max(1, int(150 / res))
+            log(f"profile {a_deg} deg (every {k*res:.0f} m): " + " ".join(f"{v:.0f}" for v in zz[::k]))
         raise RuntimeError("Could not find enough of the Somma rim; check the DEM covers the volcano")
     log(f"Somma rim found on {rim.sum()} of {az.size} azimuths "
         f"(crest {np.nanmin(crest_z):.0f}-{np.nanmax(crest_z):.0f} m, radius "
