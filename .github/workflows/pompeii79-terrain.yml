@@ -1,0 +1,52 @@
+name: Pompeii 79 - pre-AD 79 Vesuvius terrain
+
+# Builds the pre-AD 79 terrain model from Copernicus GLO-30 (public, on AWS)
+# and commits the outputs to pompeii79/terrain/output/ on the same branch.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "pompeii79/terrain/pre79_vesuvius.py"
+      - ".github/workflows/pompeii79-terrain.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packages
+        run: pip install rasterio scipy numpy matplotlib pillow
+
+      - name: Download Copernicus GLO-30 tile N40 E014 (covers Vesuvius to Stabiae)
+        run: |
+          mkdir -p dem
+          T=Copernicus_DSM_COG_10_N40_00_E014_00_DEM
+          curl -fsSL -o dem/$T.tif https://copernicus-dem-30m.s3.amazonaws.com/$T/$T.tif
+          ls -l dem
+
+      - name: Build the pre-79 model
+        shell: bash
+        run: |
+          mkdir -p pompeii79/terrain/output
+          set -o pipefail
+          python pompeii79/terrain/pre79_vesuvius.py \
+            dem/Copernicus_DSM_COG_10_N40_00_E014_00_DEM.tif pompeii79/terrain/output \
+            --source "Copernicus GLO-30 (30 m), (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA" \
+            2>&1 | tee pompeii79/terrain/output/build_log.txt
+
+      - name: Commit outputs (and the log, even if the build failed)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add pompeii79/terrain/output
+          git diff --cached --quiet || git commit -m "Pompeii 79: rebuild pre-79 terrain outputs [skip ci]"
+          git push

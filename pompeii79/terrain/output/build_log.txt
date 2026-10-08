@@ -1,0 +1,31 @@
+Gran Cono summit found: 1285 m
+Somma rim found on 57 of 180 azimuths (crest 876-1102 m, radius 1.5-2.1 km)
+Caldera floor set to 863 m (median of the moat floor); rebuilt rim gap: 123 azimuths
+{
+  "model": "Pre-79 terrain",
+  "version": "0.1",
+  "gran_cono_summit_m": 1285,
+  "caldera_floor_m": 863,
+  "somma_crest_range_m": [
+    876,
+    1102
+  ],
+  "rebuilt_rim_crest_range_m": [
+    992,
+    992
+  ],
+  "max_lowering_m": 421,
+  "max_raising_m": 338,
+  "centre_xy": [
+    451861.7008482639,
+    4519196.789371895
+  ],
+  "source_dem": "Copernicus GLO-30 (30 m), (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA",
+  "bbox_lonlat": [
+    14.3,
+    40.68,
+    14.62,
+    40.9
+  ],
+  "cell_m": 26.041119480998912
+}
