@@ -57,24 +57,40 @@
   #ui .ver-line { margin: -4px 0 6px; }
   #moreBtn { display: none; }
   #xr:empty { display: none; }
-  /* phones held upright (VR 0.13): the panel is a sheet along the bottom with the model above it; "More" opens the rest of the controls */
+  #lead { display: none; }
+  /* phones held upright (VR 0.13, compacted in 0.14): the panel is a small sheet along the bottom with the model above it;
+     closed, it shows the controls, the date and the current stage; "More" opens the commentary and the other controls */
   @media (max-width: 700px) and (orientation: portrait) {
     #ui { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none; max-height: 44%; border-radius: 14px 14px 0 0; border-bottom: 0;
-      padding: 2px 14px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 18px rgba(0,0,0,.3); }
+      padding: 0 12px calc(8px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 18px rgba(0,0,0,.3); font-size: 13.5px; }
     #ui { display: flex; flex-direction: column; overflow: clip; }   /* only the inner part scrolls */
     #ui.open { max-height: 88%; }
     #ui:not(.open) .more { display: none; }
     #uiScroll { overflow-y: auto; min-height: 0; position: relative; }   /* the handle stays put while the rest scrolls */
-    #moreBtn { display: block; flex: none; width: 100%; margin: 0 0 2px; padding: 4px 0 6px; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 12.5px; }
+    #moreBtn { display: block; flex: none; width: 100%; min-height: 0; margin: 0; padding: 6px 0 2px; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 12px; line-height: 1; }
     #moreBtn:focus-visible { outline-offset: -3px; }
-    #moreBtn::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .6; margin: 0 auto 4px; }
-    #ui h1 { display: inline; } #ui .ver-line { display: inline; margin: 0 0 0 6px; }
+    #moreBtn::before { content: ""; display: inline-block; vertical-align: middle; width: 36px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .6; margin: 0 8px 2px 0; }
+    #ui h1 { display: inline; font-size: 15px; } #ui .ver-line { display: inline; margin: 0 0 0 6px; font-size: 11.5px; }
     #ui .sub.ver-line + .sub { margin-top: 6px; }
+    #uiScroll > .more:first-child { margin-top: 6px; }
+    #ui .row { margin-top: 5px; } #ui .row button { min-height: 40px; padding: 6px 8px; }
+    input[type=range] { margin-top: 6px; }
+    #date { margin-top: 5px; font-size: 13.5px; }
+    #ui:not(.open) #date, #ui:not(.open) #lead { display: inline; }
+    #ui:not(.open) #lead { margin-left: 6px; }   /* closed: the date and the current stage on one line; the full commentary is under More */
+    #ui:not(.open) #info { display: none; }
+    #info { font-size: 13px; min-height: 0; }
     #xr { position: static; transform: none; margin: 6px 0 0; justify-content: center; }   /* the AR button sits in the sheet (the script moves it) */
     #xr button { width: 100% !important; }
-    #creditBox { top: 8px; right: 8px; bottom: auto; max-width: 48%; }
-    #vaCard.va-vr.on { position: absolute; left: 8px; right: auto; top: 8px; bottom: auto; width: min(200px, 42%); }
-    #vaCard.va-vr.on img { height: 64px; }
+    #creditBox { top: 6px; right: 6px; bottom: auto; max-width: 48%; font-size: 10px; padding: 3px 6px; }
+    /* eyewitness cards are off by default on a phone (turn them on under More > Evidence from 1944); when on, a small card without the photo */
+    #vaCard.va-vr.on { position: absolute; left: 6px; right: auto; top: 6px; bottom: auto; width: min(200px, 46%); }
+    #vaCard.va-vr.on img { display: none; }
+    #vaCard.va-vr.on .in { padding: 6px 8px 8px; }
+    #vaCard.va-vr.on .k { font-size: 10px; }
+    #vaCard.va-vr.on blockquote { font-size: 12px; line-height: 1.3; }
+    #vaCard.va-vr.on .va-who { font-size: 11px; }
+    #vaCard.va-vr.on .row2 button { min-height: 32px; padding: 3px 8px; font-size: 12px; }
   }
   /* touch screens: bigger targets, no double-tap zoom on controls */
   button, summary, input[type=range], a { touch-action: manipulation; }
@@ -107,7 +123,7 @@
   <div class="row more"><button id="standSS" aria-pressed="false" disabled>Stand in San Sebastiano</button><button id="standPO" aria-pressed="false" disabled>Stand in Pompei</button></div>
   <div class="row more"><button id="standTable" disabled>Back to the table</button></div>
   <div class="row more" role="group" aria-label="Show or hide"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
-  <div id="date"></div>
+  <div id="date"></div><span id="lead"></span>
   <div id="info">Loading the volcano…</div>
   <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <details class="va-sec more">
@@ -129,7 +145,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR 0.13</td><td>0.13: works on a phone held upright: the panel becomes a sheet along the bottom with the model above it, "More" opens the rest of the controls, the AR button sits in the sheet, bigger touch targets, and the credits move to the top right. 0.12: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.11: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.14</td><td>0.14: on a phone the sheet is smaller: closed, it shows the controls with the date and the stage on one line, and the commentary is under More; eyewitness cards are off by default (turn them on under Evidence from 1944) and smaller when on; smaller credits. 0.13: works on a phone held upright: the panel becomes a sheet along the bottom with the model above it, "More" opens the rest of the controls, the AR button sits in the sheet, bigger touch targets, and the credits move to the top right. 0.12: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.11: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
@@ -354,7 +370,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.13";
+const VERSION = "VR 0.14";
 const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
 document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line">Version ${VERSION.slice(3)}</div>`);
@@ -362,7 +378,8 @@ if (matchMedia("(pointer: coarse)").matches) document.getElementById("howTo").te
 const LM = window.LavaModel;
 const $ = (id) => document.getElementById(id);
 let panelDirty = true, panelInfo = "", panelDate = "", panelMoment = null, panelMomentKey = "";
-const info = (html) => { $("info").innerHTML = html; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); panelDirty = true; };
+const info = (html) => { $("info").innerHTML = html; panelInfo = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); panelDirty = true;
+  const b = /<b>(.*?)<\/b>/.exec(html); $("lead").textContent = b ? b[1] : panelInfo.split(/(?<=[.!?…])\s/)[0]; };   // the stage in a few words, for the phone sheet (0.14)
 // Screen-reader announcements: only for real changes (a new stage, arriving in a town), never for loading percentages
 let lastSaid = "";
 const announce = (html) => { const t = html.replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, ""); if (t === lastSaid) return; lastSaid = t;
@@ -1241,6 +1258,7 @@ window.__ves = { enterWalk, leaveWalk, get walk() { return walk; }, get localP()
 <script>
   if (window.VesuviusArchive) {
     VesuviusArchive.mount({ panel: document.getElementById("vaPanel"), page: "vr", mapwrap: document.body });
+    if (matchMedia("(max-width: 700px) and (orientation: portrait)").matches) VesuviusArchive.setCards(false);   // a phone shows the eruption; accounts are under More (0.14)
     document.querySelectorAll(".va-ver-n").forEach(el => { el.textContent = VesuviusArchive.version; });
   } else document.getElementById("vaPanel").textContent = "The 1944 archive couldn't load.";
 </script>
