@@ -154,7 +154,7 @@
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR story 0.11</td><td>0.11: on a phone the sheet is more compact: smaller type and buttons, the date and the stage on one line, and the commentary under More; smaller credits. 0.10: works on a phone held upright: the panel becomes a sheet along the bottom with the model above it, "More" opens the rest of the controls, the AR button sits in the sheet, bigger touch targets, and the credits move to the top right. 0.9: “Photos and eyewitnesses” (the newsreels were removed from the shared archive, version 1.7, as both need a paid licence). 0.8: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.7: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.6: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.5: standing in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
+      <tr><td>App</td><td>VR story 0.12</td><td>0.12: sound on iPhone: the audio is started properly inside the tap, and a silent track loops while the eruption plays so the ring/silent switch does not mute it. 0.11: on a phone the sheet is more compact: smaller type and buttons, the date and the stage on one line, and the commentary under More; smaller credits. 0.10: works on a phone held upright: the panel becomes a sheet along the bottom with the model above it, "More" opens the rest of the controls, the AR button sits in the sheet, bigger touch targets, and the credits move to the top right. 0.9: “Photos and eyewitnesses” (the newsreels were removed from the shared archive, version 1.7, as both need a paid licence). 0.8: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.7: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.6: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.5: standing in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.4: accessibility (keyboard control of the model, screen-reader descriptions and announcements of each moment, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.3: the whole eruption plays without stopping (about 1½ minutes) as the moments change; afterwards Back and Next open each moment, and Play replays that part. 0.2: fixes from review (Play beats the automatic start, the first moment is before the eruption, model versions listed, text corrections). 0.1: Guided version of Vesuvius VR 0.4: the same eight moments as the 3D story, with Back, Play and Next on screen and on the headset menu. Each moment plays one part of the eruption, then waits for you. Sound starts off</td></tr>
       <tr><td>Lava model</td><td>1.0</td><td>DOWNFLOW-style steepest descent with hollow filling (same code as the lava explorer), run for the two 1944 flows; lava drawn where at least 1 in 5 flows went</td></tr>
       <tr><td>Lava look and timing</td><td>0.1</td><td>Cools from yellow-hot to a dark crust; one speed, timed so the northern flow reaches San Sebastiano early on 21 March. First numbered version</td></tr>
       <tr><td>Ash cloud and fountains</td><td>0.2</td><td>Illustration: eight fountains up to about 4 km, an ash column over 5 km blown east, then bursts under 2 km blown south-west. 0.2: those bursts lowered from 3 km (INGV)</td></tr>
@@ -384,7 +384,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR story 0.11";
+const VERSION = "VR story 0.12";
 const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
 const VERSIONS = { app: VERSION, lava: "1.0", lavaLook: "0.1", cloud: "0.2", ground: "0.1", sound: "0.1", archive: window.VesuviusArchive ? VesuviusArchive.version : "missing" };
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
@@ -921,9 +921,10 @@ function buildLabels() {
 // ---------------- Sound (made in the browser, no audio files) ----------------
 const snd = { ctx: null, on: false };
 function initSound() {
-  if (snd.ctx) { if (snd.ctx.state !== "running") snd.ctx.resume(); return; }
+  if (snd.ctx) { if (snd.ctx.state !== "running") snd.ctx.resume(); unlockMedia(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-  const ctx = new AC(); snd.ctx = ctx;
+  const ctx = new AC(); snd.ctx = ctx; if (ctx.state !== "running") ctx.resume();   // Safari starts it suspended even inside a tap (story 0.12)
+  unlockMedia();
   const master = ctx.createGain(); master.gain.value = snd.on ? 0.9 : 0; master.connect(ctx.destination); snd.master = master;
   const noise = (seconds, brown) => { const b = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate), d = b.getChannelData(0); let last = 0;
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; } return b; };
@@ -937,6 +938,22 @@ function initSound() {
   snd.roar = loop(white, "bandpass", 420, 0.6, snd.volcanoPan);       // roar of the lava fountains and column
   snd.crackleBuf = white; snd.nextCrackle = 0; snd.nextBoom = 0;
 }
+// iPhone: the ring/silent switch mutes Web Audio unless a media element is playing, so a silent track loops while the
+// eruption plays with sound on (the same trick games use; it shows as "playing" on the lock screen) (story 0.12)
+const SILENT_WAV = (() => { const n = 8000, b = new ArrayBuffer(44 + n), v = new DataView(b), w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);   // one second of 8-bit silence
+  return URL.createObjectURL(new Blob([b], { type: "audio/wav" })); })();
+function unlockMedia() {   // called inside a tap: the first play() is what unlocks the element
+  if (!snd.silence) { const a = new Audio(SILENT_WAV); a.loop = true; a.setAttribute("playsinline", ""); a.preload = "auto"; a.id = "silence"; document.body.append(a); snd.silence = a; }
+  snd.silence.play().catch(() => {}); syncSilence();
+}
+function syncSilence() {
+  if (!snd.silence) return;
+  if (snd.on && pb.playing && !document.hidden) snd.silence.play().catch(() => {}); else snd.silence.pause();
+}
+document.addEventListener("visibilitychange", () => { if (!snd.ctx) return; if (!document.hidden && snd.ctx.state !== "running") snd.ctx.resume(); syncSilence(); });
 function crackle(ctx, t, gain) {
   const s = ctx.createBufferSource(); s.buffer = snd.crackleBuf; const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = rnd(1800, 4000);
   const g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + rnd(0.01, 0.04));
@@ -995,7 +1012,7 @@ const PHASE_TEXT = {
 
 // ---------------- Playback ----------------
 const pb = { sec: 0, playing: false, last: 0, phase: -1, townShown: false };
-function setPlaying(v) { pb.playing = v; if (v) initSound(); syncPlay(); panelDirty = true; }
+function setPlaying(v) { pb.playing = v; if (v) initSound(); else syncSilence(); syncPlay(); panelDirty = true; }
 function restart() { pb.sec = 0; pb.phase = -1; pb.townShown = false; for (const p of [ashP, ftnP]) { p.age.fill(1e9); p.D.fill(0); p.da.needsUpdate = true; } setPlaying(true); }
 function stepPlayback(now) {
   const dt = Math.min(0.05, (now - (pb.last || now)) / 1000); pb.last = now;
@@ -1073,7 +1090,7 @@ $("watchAll").onclick = () => watchAll();
 $("restart").onclick = () => restart();
 const toggles = { sound: false, ash: true, names: true };
 function setToggle(k, v) { toggles[k] = v; const btn = { sound: "sound", ash: "ashBtn", names: "names" }[k]; $(btn).setAttribute("aria-pressed", String(v));
-  if (k === "sound") { snd.on = v; if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); }
+  if (k === "sound") { snd.on = v; if (v) initSound(); if (snd.master) snd.master.gain.setTargetAtTime(v ? 0.9 : 0, snd.ctx.currentTime, 0.05); syncSilence(); }
   if (k === "ash") { U.uAshOn.value = v ? 1 : 0; if (ashP) ashP.mesh.visible = v; }
   if (k === "names") labels.visible = v && !walk;
   panelDirty = true; }
