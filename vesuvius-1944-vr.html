@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
 <title>Vesuvius 1944 in VR</title>
 <meta name="description" content="Tabletop 3D and VR model of the March 1944 eruption of Vesuvius for grades 6-8: lava flows from a published lava-hazard method, lava fountains, the eruption column and ash fall, with sound. Works in a browser and on Meta Quest with passthrough." />
 <script type="importmap">
@@ -43,6 +43,7 @@
   #creditBox { position: absolute; right: 8px; bottom: 6px; max-width: 60%; text-align: right; font-size: 11px; line-height: 1.35; color: #ece8df;
     background: rgba(20,18,16,.82); border-radius: 6px; padding: 4px 8px; }
   #creditBox p { margin: 0; }
+  #creditBox .nw { white-space: nowrap; }
   #madeby { font-weight: 600; }
   #creditBox #credits { margin-top: 3px; font-weight: 400; }
   #srcBtn { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
@@ -53,6 +54,31 @@
   /* small screens and 400% zoom: keep everything available (sections stay collapsed rather than hidden) */
   @media (max-width: 700px) { #ui { width: auto; right: 12px; padding: 10px; max-height: 55%; } #creditBox { max-width: calc(100% - 16px); } }
   @media (forced-colors: active) { #creditBox { border: 1px solid CanvasText; } button[aria-pressed="false"] { border-style: dashed; } }
+  #ui .ver-line { margin: -4px 0 6px; }
+  #moreBtn { display: none; }
+  #xr:empty { display: none; }
+  /* phones held upright (VR 0.13): the panel is a sheet along the bottom with the model above it; "More" opens the rest of the controls */
+  @media (max-width: 700px) and (orientation: portrait) {
+    #ui { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none; max-height: 44%; border-radius: 14px 14px 0 0; border-bottom: 0;
+      padding: 2px 14px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 18px rgba(0,0,0,.3); }
+    #ui { display: flex; flex-direction: column; overflow: clip; }   /* only the inner part scrolls */
+    #ui.open { max-height: 88%; }
+    #ui:not(.open) .more { display: none; }
+    #uiScroll { overflow-y: auto; min-height: 0; position: relative; }   /* the handle stays put while the rest scrolls */
+    #moreBtn { display: block; flex: none; width: 100%; margin: 0 0 2px; padding: 4px 0 6px; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 12.5px; }
+    #moreBtn:focus-visible { outline-offset: -3px; }
+    #moreBtn::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .6; margin: 0 auto 4px; }
+    #ui h1 { display: inline; } #ui .ver-line { display: inline; margin: 0 0 0 6px; }
+    #ui .sub.ver-line + .sub { margin-top: 6px; }
+    #xr { position: static; transform: none; margin: 6px 0 0; justify-content: center; }   /* the AR button sits in the sheet (the script moves it) */
+    #xr button { width: 100% !important; }
+    #creditBox { top: 8px; right: 8px; bottom: auto; max-width: 48%; }
+    #vaCard.va-vr.on { position: absolute; left: 8px; right: auto; top: 8px; bottom: auto; width: min(200px, 42%); }
+    #vaCard.va-vr.on img { height: 64px; }
+  }
+  /* touch screens: bigger targets, no double-tap zoom on controls */
+  button, summary, input[type=range], a { touch-action: manipulation; }
+  @media (pointer: coarse) { button { min-height: 44px; } details summary { padding: 8px 0; } #srcBtn { min-height: 0; padding: 10px 4px; margin: -10px -4px; } }
   #ui .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #ui .btns button { flex: 1 1 auto; font-size: 12.5px; padding: 6px 8px; }
   #ui .hint { font-size: 12px; color: var(--muted); }
@@ -69,25 +95,27 @@
 <canvas id="three" tabindex="0" role="application" aria-roledescription="3D model" aria-label="3D model of Vesuvius and the surrounding towns" aria-describedby="modelDesc keysHelp"></canvas>
 <p id="modelDesc" class="sr-only">A 3D model of Vesuvius, Monte Somma and the plain to the east, made from satellite images and elevation data. When the eruption plays, lava flows spread north towards San Sebastiano and south-east, lava fountains rise from the crater, and an ash column drifts east and then south-west. The panel describes each stage in words as it happens.</p>
 <div id="ui" role="region" aria-labelledby="appTitle">
-  <div style="background:var(--chip);border-left:4px solid var(--accent);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px"><b>New:</b> <a href="vesuvius-1944-vr-story.html" style="color:var(--accent);font-weight:600">a step-by-step version</a> that pauses at each moment of the eruption.</div>
+  <button id="moreBtn" type="button" aria-expanded="false"><span>More</span> <span aria-hidden="true">▾</span></button>
+  <div id="uiScroll">
+  <div class="more" style="background:var(--chip);border-left:4px solid var(--accent);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px"><b>New:</b> <a href="vesuvius-1944-vr-story.html" style="color:var(--accent);font-weight:600">a step-by-step version</a> that pauses at each moment of the eruption.</div>
   <h1 id="appTitle">Vesuvius, March 1944</h1>
-  <div class="sub" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
-  <div class="sub" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
+  <div class="sub more" id="howTo">Drag to turn the model, scroll or pinch to zoom. On a Quest 3, press "View on your table".</div>
+  <div class="sub more" id="keysHelp">Keyboard: Tab to the model, then use the arrow keys to turn it, + and − to zoom, and Home to reset the view.</div>
   <div class="row"><button id="play" class="primary" disabled><span aria-hidden="true">▶ </span>Play</button><button id="restart" disabled>Restart</button></div>
   <label for="scrub" class="sr-only">Eruption timeline</label>
   <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-valuetext="18 March 1944" disabled />
-  <div class="row"><button id="standSS" aria-pressed="false" disabled>Stand in San Sebastiano</button><button id="standPO" aria-pressed="false" disabled>Stand in Pompei</button></div>
-  <div class="row"><button id="standTable" disabled>Back to the table</button></div>
-  <div class="row" role="group" aria-label="Show or hide"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
+  <div class="row more"><button id="standSS" aria-pressed="false" disabled>Stand in San Sebastiano</button><button id="standPO" aria-pressed="false" disabled>Stand in Pompei</button></div>
+  <div class="row more"><button id="standTable" disabled>Back to the table</button></div>
+  <div class="row more" role="group" aria-label="Show or hide"><button id="sound" aria-pressed="true">Sound</button><button id="ashBtn" aria-pressed="true">Ash</button><button id="names" aria-pressed="true">Names</button></div>
   <div id="date"></div>
   <div id="info">Loading the volcano…</div>
   <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-  <details class="va-sec">
+  <details class="va-sec more">
     <summary>Evidence from 1944 <span class="ver va-ver">archive</span></summary>
     <label style="display:block;margin:6px 0 2px;font-size:13px"><input type="checkbox" id="eVoices" checked onchange="VesuviusArchive.setCards(this.checked)" /> Show eyewitness accounts as it plays</label>
     <div id="vaPanel"></div>
   </details>
-  <details>
+  <details class="more">
     <summary>How this works</summary>
     <p><b>Where the lava goes</b> comes from the same method as the Vesuvius lava page (DOWNFLOW, Favalli and colleagues 2005), run on today's ground for the two 1944 flows: north (stopping at about 140 m above sea level) and south-east (about 350 m). Lava is drawn where at least 1 in 5 of the simulated flows went.</p>
     <p><b>When it gets there</b> is an estimate. The lava moves at a steady speed, set so that the northern flow reaches San Sebastiano early on 21 March, as recorded. The real speed varied from 50 to 300 m an hour. The colours show lava cooling from yellow-hot to a dark crust, and are for illustration.</p>
@@ -96,20 +124,21 @@
     <p>Town labels are placed approximately. On the table, heights are exaggerated 1.5 times, and the column is drawn to the same scale.</p>
     <p>Sources: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944" target="_blank" rel="noopener">INGV Osservatorio Vesuviano<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886" target="_blank" rel="noopener">Geological Magazine reconstruction<span class="sr-only"> (opens in a new tab)</span></a> · <a href="https://www.tandfonline.com/doi/pdf/10.4113/jom.2008.1003" target="_blank" rel="noopener">1944 lava flow map (Journal of Maps)<span class="sr-only"> (opens in a new tab, PDF)</span></a></p>
   </details>
-  <details>
+  <details class="more">
     <summary>Versions</summary>
     <table class="vers">
       <caption class="sr-only">Version numbers of the app and its parts</caption>
       <tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr>
-      <tr><td>App</td><td>VR 0.12</td><td>0.12: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.11: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
+      <tr><td>App</td><td>VR 0.13</td><td>0.13: works on a phone held upright: the panel becomes a sheet along the bottom with the model above it, "More" opens the rest of the controls, the AR button sits in the sheet, bigger touch targets, and the credits move to the top right. 0.12: credits shortened to one line with a Sources list (exact data credits, “Powered by Esri”); © line removed; height note moved to the headset menu. 0.11: in a town, going more than about 2 km up fades the daylight sky and haze to the dark table background. 0.10: when the eruption ends, the last ash drifts away and settles instead of stopping in mid-air. 0.9: in a town you are no longer fixed to one spot: the mouse, wheel and keys work as on the table, starting at eye level, never below the ground. 0.8: in a town, the scroll wheel and + / − zoom in like binoculars, and right-drag looks around (both did nothing there). 0.7: standing in a town only changes the view; the eruption carries on from the same moment at the same pace (it used to jump to just before the lava or ash arrived and slow to 3 minutes a second). 0.6: accessibility (keyboard control of the model, screen-reader descriptions and announcements, contrast, focus outlines, all sections available on small screens and when zoomed) and credit tag. 0.5: link to the step-by-step VR story. 0.4: adds the 1944 archive (newsreels, photos, eyewitness accounts, historian tasks) and eyewitness accounts on screen and on the headset menu as the eruption plays</td></tr>
       <tr><td>1944 archive</td><td class="va-ver-n">–</td><td>Shared file from jsawle/curriculum_artifacts (vesuvius-1944-archive.js), also used by the lava explorer and the 3D eruption page</td></tr>
     </table>
   </details>
+  </div>
 </div>
 <div id="xr"></div>
 </main>
 <footer id="creditBox">
-  <p id="madeby">Created by Jason Sawle · Powered by Esri · <button id="srcBtn" type="button" aria-expanded="false" aria-controls="credits">Sources</button></p>
+  <p id="madeby"><span class="nw">Created by Jason Sawle</span> · <span class="nw">Powered by Esri</span> · <button id="srcBtn" type="button" aria-expanded="false" aria-controls="credits">Sources</button></p>
   <p id="credits" hidden></p>
 </footer>
 <script>
@@ -325,10 +354,11 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 import { XRHandModelFactory } from "three/addons/webxr/XRHandModelFactory.js";
 
-const VERSION = "VR 0.12";
+const VERSION = "VR 0.13";
 const CREDIT_TAG = "Created by Jason Sawle · Powered by Esri";
 document.title = "Vesuvius 1944 in VR (" + VERSION + ")";
-document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line" style="margin:-4px 0 6px">Version ${VERSION.slice(3)}</div>`);
+document.querySelector("#ui h1").insertAdjacentHTML("afterend", `<div class="sub ver-line">Version ${VERSION.slice(3)}</div>`);
+if (matchMedia("(pointer: coarse)").matches) document.getElementById("howTo").textContent = "One finger turns the model, two fingers slide it, pinch to zoom.";
 const LM = window.LavaModel;
 const $ = (id) => document.getElementById(id);
 let panelDirty = true, panelInfo = "", panelDate = "", panelMoment = null, panelMomentKey = "";
@@ -467,7 +497,29 @@ const controls = new OrbitControls(camera, canvas); controls.target.set(0.02, 0.
 controls.minDistance = 0.15; controls.maxDistance = 3; controls.maxPolarAngle = Math.PI * 0.49;
 scene.add(new THREE.HemisphereLight(0xfff6e8, 0x40382e, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(-0.6, 1.2, -0.4); scene.add(sun);
-addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+// Phones held upright (0.13): the panel is a sheet along the bottom of the screen, so the view is centred in the space above it
+// and the vertical angle opens up (45° across the width) so the whole table stays in view. A window wider than it is tall sees no change.
+const sheetMq = matchMedia("(max-width: 700px) and (orientation: portrait)");
+const ui = $("ui"), moreBtn = $("moreBtn"), xrBox = $("xr");
+let sheetH = 0;
+function fitView(reset) {
+  const w = innerWidth, h = innerHeight;
+  if (reset === true) sheetH = 0;
+  // the sheet's height only grows between resizes, so the view doesn't jump each time the text changes
+  if (!sheetMq.matches) sheetH = 0; else if (!ui.classList.contains("open")) sheetH = Math.min(Math.max(sheetH, ui.offsetHeight), h * 0.6);
+  const visH = Math.max(1, h - sheetH);
+  const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(22.5)) / Math.min(1, w / visH));
+  camera.aspect = w / h; camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(half) * (h + sheetH) / visH));
+  if (sheetH) camera.setViewOffset(w, h + sheetH, 0, sheetH, w, h); else camera.clearViewOffset();
+  if (!renderer.xr.isPresenting) { camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+}
+moreBtn.onclick = () => { const open = ui.classList.toggle("open"); moreBtn.setAttribute("aria-expanded", String(open));
+  moreBtn.firstElementChild.textContent = open ? "Less" : "More"; moreBtn.lastElementChild.textContent = open ? "▴" : "▾"; if (!open) $("uiScroll").scrollTop = 0; fitView(); };
+const placeXr = () => { if (sheetMq.matches) $("scrub").after(xrBox); else document.querySelector("main").append(xrBox); };   // on a phone the AR button sits in the sheet
+sheetMq.addEventListener("change", () => { placeXr(); fitView(true); });
+addEventListener("resize", () => fitView(true));
+new ResizeObserver(() => { if (sheetMq.matches && !ui.classList.contains("open")) fitView(); }).observe(ui);
+placeXr(); fitView();
 
 const TABLE_WIDTH = 1.0;
 const table = new THREE.Group(); scene.add(table);
@@ -1009,7 +1061,6 @@ canvas.addEventListener("keydown", (e) => {
 });
 
 // ---------------- WebXR ----------------
-const xrBox = $("xr");
 if (navigator.xr) (async () => {
   const opts = { requiredFeatures: ["local-floor"], optionalFeatures: ["hand-tracking"] };
   const [arOK, vrOK] = await Promise.all(["immersive-ar", "immersive-vr"].map(m => navigator.xr.isSessionSupported(m).catch(() => false)));
@@ -1027,10 +1078,12 @@ renderer.xr.addEventListener("sessionstart", () => {
   const ar = renderer.xr.getSession().environmentBlendMode && renderer.xr.getSession().environmentBlendMode !== "opaque";
   isAR = !!ar; scene.background = ar ? null : bg; floor.visible = !ar; stand.visible = !ar;
   needPlace = true; panel.visible = true; initSound();
+  camera.clearViewOffset();   // the headset sets its own view (0.13)
 });
 renderer.xr.addEventListener("sessionend", () => {
   if (walk) leaveWalk();
   scene.background = bg; floor.visible = stand.visible = false; table.position.set(0, 0, 0); table.scale.setScalar(1); table.rotation.set(0, 0, 0); panel.visible = false;
+  fitView();
 });
 
 // Floating 3D menu
