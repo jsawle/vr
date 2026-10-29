@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Vesuvius 1944 in AR (lab)</title>
+<meta name="description" content="Lab version: the March 1944 eruption of Vesuvius as an AR model for iPhone and iPad (Apple AR Quick Look). Lava flows, lava fountains, the eruption column and ash fall, played as a loop on a real table. Grades 6-8." />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+  "lerc": "https://cdn.jsdelivr.net/npm/lerc@4.2.0/LercDecode.es.js"
+} }
+</script>
+<style>
+  /* same palette as the VR app: --accent for text and lines, --accent-btn behind white button text (5.9:1) */
+  :root { --bg: #1c1b19; --panel: #fffdf8; --ink: #22201c; --muted: #5f5a51; --rule: #ddd6c8; --accent: #b4381c; --accent-btn: #b4381c; --chip: #efe9dd; --focus: #b4381c; }
+  @media (prefers-color-scheme: dark) { :root { --panel: #1f1d1a; --ink: #ece8df; --muted: #b3ac9e; --rule: #3a3630; --accent: #f07a55; --chip: #2b2823; --focus: #ffb59c; } }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--panel); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { display: grid; grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto; }
+  header { padding: 14px 16px 6px; }
+  h1 { font-size: 20px; margin: 0; }
+  .lab { font-size: 12px; font-weight: 700; vertical-align: middle; border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .sub { font-size: 14px; color: var(--muted); margin: 2px 0 0; }
+  #stage { position: relative; margin: 0; background: var(--bg); height: min(56vh, 78vw); min-height: 240px; }
+  canvas#three { display: block; width: 100%; height: 100%; touch-action: none; }
+  canvas#three:focus-visible { outline: 3px solid var(--focus); outline-offset: -4px; }
+  /* bottom-right credit box: solid background so the text keeps its contrast over the imagery */
+  #creditBox { position: absolute; right: 6px; bottom: 6px; max-width: calc(100% - 12px); font-size: 11.5px; line-height: 1.3; color: #ece8df; background: rgba(20,18,16,.85); border-radius: 6px; padding: 3px 8px; font-weight: 600; }
+  #panel { padding: 12px 16px 24px; }
+  #arArea { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  /* Safari only treats the link as AR if its first child is an image, so the visible label sits beside it */
+  #arLink { display: inline-block; border-radius: 12px; line-height: 0; }
+  #arLink img { width: 260px; height: 64px; border-radius: 12px; display: block; background: var(--accent-btn); }
+  #arLink[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+  #arLink:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  #status { margin: 8px 0 0; font-size: 14.5px; }
+  #noAr { margin: 8px 0 0; font-size: 14.5px; background: var(--chip); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 10px; }
+  .row { display: flex; gap: 8px; margin-top: 14px; }
+  button { font: inherit; font-weight: 600; font-size: 15px; border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; border: 1px solid var(--rule); background: var(--chip); color: var(--ink); }
+  button.primary { background: var(--accent-btn); color: #fff; border-color: transparent; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 14px 0 0; min-height: 32px; }
+  #date { font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  #stageText { margin: 4px 0 0; min-height: 4.4em; font-size: 15px; }
+  details { margin-top: 12px; border-top: 1px solid var(--rule); padding-top: 10px; font-size: 14.5px; }
+  details summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+  details ol, details ul { padding-left: 20px; margin: 6px 0; }
+  details li { margin: 3px 0; }
+  .ver { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 6px; }
+  th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); padding: 5px 6px; }
+  a { color: var(--accent); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* iPad landscape and wider: model on the left, controls on the right */
+  @media (min-width: 900px) and (orientation: landscape) {
+    main { grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; height: 100vh; }
+    header { grid-column: 1 / 3; }
+    #stage { height: auto; min-height: 0; }
+    #panel { overflow-y: auto; }
+  }
+  @media (forced-colors: active) { #creditBox, #arLink { border: 1px solid CanvasText; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Vesuvius 1944 in AR <span class="lab">Lab</span></h1>
+    <p class="sub">The March 1944 eruption on a real table, for iPhone and iPad. <span id="verLine"></span></p>
+  </header>
+
+  <figure id="stage">
+    <canvas id="three" tabindex="0" role="img" aria-label="3D preview of Vesuvius and the plain around it, the same model that opens in AR. Use the arrow keys to turn it, plus and minus to zoom."></canvas>
+    <div id="creditBox">Created by Jason Sawle · Powered by Esri</div>
+  </figure>
+
+  <div id="panel">
+    <div id="arArea">
+      <a id="arLink" rel="ar" href="#" aria-disabled="true"><img id="arImg" alt="View in AR (preparing)" width="260" height="64" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" /></a>
+    </div>
+    <p id="status" role="status">Loading the volcano…</p>
+    <p id="noAr" hidden>The AR view opens on an iPhone or iPad. On this device you can watch the same model above, or use the <a href="vesuvius-1944-vr.html">VR version</a>.</p>
+
+    <h2 class="sr-only">Preview</h2>
+    <div class="row">
+      <button id="play" class="primary" disabled><span aria-hidden="true">▶ </span>Play</button>
+      <button id="restart" disabled>Restart</button>
+    </div>
+    <input id="scrub" type="range" min="0" max="1000" step="1" value="0" aria-label="Time in the eruption" disabled />
+    <div id="date">18 March 1944, 16:30</div>
+    <p id="stageText" aria-live="polite"></p>
+
+    <details id="what">
+      <summary>What plays in AR</summary>
+      <p>The AR model plays the eruption as a loop of about <span id="loopS">66</span> seconds and then starts again. A sign in front of the model shows the date and what is happening.</p>
+      <ol id="whatList"></ol>
+      <p>Heights are 1.5 times real so the slopes are easier to see. Lava thickness and the ash cloud are drawn to be seen, not to scale.</p>
+    </details>
+
+    <details>
+      <summary>How to open it on a table</summary>
+      <ol>
+        <li>Wait for “AR model ready”, then tap <b>View in AR</b>.</li>
+        <li>Point the camera at a table or the floor and move it slowly until the model appears.</li>
+        <li>Pinch to make it bigger or smaller, drag to move it, and twist with two fingers to turn it.</li>
+        <li>Walk around it or move the device closer to look at the towns and the lava.</li>
+        <li>The <b>Object</b> tab at the top shows the model without the camera, which works on a small desk.</li>
+      </ol>
+      <p>Apple's AR viewer has no play controls of its own: the model plays from the start each time you open it. Sound isn't included yet.</p>
+    </details>
+
+    <details id="about">
+      <summary>About and versions</summary>
+      <p>This is a lab version for testing, made from the <a href="vesuvius-1944-vr.html">VR version</a>. It works out the lava flows on your device, builds a 3D model file and hands it to Apple's AR viewer. The VR version stays as it is.</p>
+      <table>
+        <thead><tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">Notes</th></tr></thead>
+        <tbody id="verTable"></tbody>
+      </table>
+    </details>
+
+    <details id="sourcesBox">
+      <summary>Sources</summary>
+      <p id="credits">Loading…</p>
+      <p>1944 events: <a href="https://www.ov.ingv.it/index.php/storia-vesuvio/1944">INGV Osservatorio Vesuviano</a>; <a href="https://www.cambridge.org/core/journals/geological-magazine/article/abs/1944-eruption-of-vesuvius-italy-combining-contemporary-accounts-and-field-studies-for-a-new-volcanological-reconstruction/FAAB3DB576934D13AB5D865E33117886">Cole &amp; Scarpati, Geological Magazine</a>.</p>
+    </details>
+  </div>
+</main>
+
+<!-- Lava model: copied unchanged from vesuvius-1944-vr.html (VR 0.15) -->
+<script>
+/* Lava flow model — DOWNFLOW-style probabilistic steepest descent.
+   Principle (Favalli et al. 2005): lava follows the steepest downhill path;
+   repeat N times over topography randomly perturbed by ±dh; count how often
+   each cell is crossed.
+   Pit handling (in the spirit of Q-LavHA's pit-filling correction): when a
+   path reaches a hollow with no downhill neighbour, the hollow is filled
+   (priority flood) up to its spill point, the filled cells count as covered,
+   and the path continues from the spill point. This also handles a vent
+   placed inside a crater. */
+(function (root) {
+  "use strict";
+
+  // Deterministic noise in [-1, 1] for (run, cell).
+  function noise(run, idx, seed) {
+    let h = (Math.imul(run + 1, 0x9E3779B1) ^ Math.imul(idx + 1, 0x85EBCA77) ^ seed) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x7FEB352D) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x846CA68B) >>> 0;
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 2147483647.5 - 1;
+  }
+
+  const DI = [-1, 0, 1, -1, 1, -1, 0, 1];
+  const DJ = [-1, -1, -1, 0, 0, 1, 1, 1];
+  const DD = [Math.SQRT2, 1, Math.SQRT2, 1, 1, Math.SQRT2, 1, Math.SQRT2];
+
+  function Heap() { this.k = []; this.v = []; }
+  Heap.prototype.push = function (key, val) {
+    const K = this.k, V = this.v; K.push(key); V.push(val); let i = K.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1; if (K[p] <= K[i]) break;
+      [K[p], K[i]] = [K[i], K[p]]; [V[p], V[i]] = [V[i], V[p]]; i = p;
+    }
+  };
+  Heap.prototype.pop = function () {
+    const K = this.k, V = this.v; const tk = K[0], tv = V[0];
+    const lk = K.pop(), lv = V.pop();
+    if (K.length) {
+      K[0] = lk; V[0] = lv; let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < K.length && K[l] < K[m]) m = l;
+        if (r < K.length && K[r] < K[m]) m = r;
+        if (m === i) break;
+        [K[m], K[i]] = [K[i], K[m]]; [V[m], V[i]] = [V[i], V[m]]; i = m;
+      }
+    }
+    this.lastKey = tk; return tv;
+  };
+  Heap.prototype.size = function () { return this.k.length; };
+
+  /* Fill the hollow containing `start` on surface Z(idx) until it spills.
+     Returns { outlet, pond:[idx], level } or { capped:true } / { edge:true, outlet }. */
+  function fillHollow(Z, valid, w, ht, start, maxCells) {
+    const seen = new Set([start]);
+    const heap = new Heap();
+    heap.push(Z(start), start);
+    let level = -Infinity;
+    const pond = [];
+    while (heap.size()) {
+      const c = heap.pop(); const hc = heap.lastKey;
+      if (hc < level) return { outlet: c, pond, level };
+      level = hc; pond.push(c);
+      if (pond.length > maxCells) return { capped: true, pond, level };
+      const ci = c % w, cj = (c / w) | 0;
+      for (let k = 0; k < 8; k++) {
+        const ni = ci + DI[k], nj = cj + DJ[k];
+        if (ni < 0 || nj < 0 || ni >= w || nj >= ht) return { edge: true, outlet: c, pond, level };
+        const n = nj * w + ni;
+        if (seen.has(n) || !valid(n)) continue;
+        seen.add(n); heap.push(Z(n), n);
+      }
+    }
+    return { capped: true, pond, level };
+  }
+
+  /* One lava path. dh = 0 gives the unperturbed "most likely" path.
+     onCell(idx, step, isPond) is called for every cell covered (path + filled hollows). */
+  function descend(h, w, ht, start, run, dh, seed, cellTrue, maxLen, maxPond, onCell, stopElev) {
+    stopElev = stopElev == null ? -Infinity : stopElev;
+    const raised = new Map();                // cells filled with lava in this run → lava surface height
+    const base = (i) => h[i] + (dh ? dh * noise(run, i, seed) : 0);
+    const Z = (i) => { const r = raised.get(i); return r === undefined ? base(i) : r; };
+    const valid = (i) => isFinite(h[i]);
+    const ponds = [];
+    let cur = start, step = 0, len = 0, reason = "flat";
+    onCell(cur, 0);
+    for (let guard = 0; guard < 100000; guard++) {
+      if (h[cur] <= 0) { reason = "sea"; break; }
+      if (step > 0 && h[cur] < stopElev) { reason = "height"; break; }
+      const ci = cur % w, cj = (cur / w) | 0;
+      const zc = Z(cur);
+      let best = -1, bestSlope = 0, bestD = 1, hitEdge = false;
+      for (let k = 0; k < 8; k++) {
+        const ni = ci + DI[k], nj = cj + DJ[k];
+        if (ni < 0 || nj < 0 || ni >= w || nj >= ht) { hitEdge = true; continue; }
+        const n = nj * w + ni;
+        if (!valid(n)) continue;
+        const s = (zc - Z(n)) / DD[k];
+        if (s > bestSlope) { bestSlope = s; best = n; bestD = DD[k]; }
+      }
+      if (best < 0) {
+        if (hitEdge) { reason = "edge"; break; }
+        const f = fillHollow(Z, valid, w, ht, cur, maxPond);
+        if (f.capped) { reason = "flat"; break; }
+        const lvl = f.level + 0.01;
+        for (const c of f.pond) { if (!raised.has(c)) onCell(c, step, true); raised.set(c, lvl); }
+        ponds.push({ cells: f.pond, level: f.level, outlet: f.outlet });
+        if (f.edge) { reason = "edge"; break; }
+        const d = Math.hypot((f.outlet % w) - ci, ((f.outlet / w) | 0) - cj) * cellTrue;
+        if (len + d > maxLen) { reason = "length"; break; }
+        len += d; cur = f.outlet; step++;
+        onCell(cur, step);
+        continue;
+      }
+      if (len + bestD * cellTrue > maxLen) { reason = "length"; break; }
+      len += bestD * cellTrue; cur = best; step++;
+      onCell(cur, step);
+    }
+    return { end: cur, steps: step, length: len, reason, ponds };
+  }
+
+  /* opts: h (Float32Array heights in m, NaN = no data, <=0 = sea), w, ht,
+     cellTrue (m per cell), vent (idx), runs, dh (m), maxLen (m), seed,
+     stopElev (m, optional: a flow ends once it drops below this height),
+     width (m, optional: each path is widened to this footprint before counting — real flows are tens to hundreds of metres wide),
+     targets: [{name, cells:Int32Array}] */
+  // Incremental runner: call step(n) repeatedly (lets a page yield between batches), then result().
+  function createRunner(opts) {
+    const { h, w, ht, cellTrue, vent } = opts;
+    const runs = opts.runs | 0, dh = +opts.dh, maxLen = +opts.maxLen, seed = (opts.seed | 0) >>> 0;
+    const maxPond = opts.maxPond || 4000;
+    const N = w * ht;
+    const count = new Int32Array(N);
+    const first = new Int32Array(N).fill(-1);
+    const targets = (opts.targets || []).map(t => {
+      const m = new Uint8Array(N); for (const c of t.cells) m[c] = 1;
+      return { name: t.name, mask: m, hits: 0 };
+    });
+    const lengths = [], reasons = { sea: 0, edge: 0, flat: 0, length: 0, height: 0 };
+    const seenRun = new Int32Array(N).fill(-1);
+    const stopElev = opts.stopElev == null ? -Infinity : +opts.stopElev;
+    const rad = Math.max(0, (+opts.width || 0) / 2 / cellTrue);
+    const offs = [];                                   // disc of cells around each path cell
+    const R = Math.floor(rad);
+    for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) if (di * di + dj * dj <= rad * rad + 1e-9) offs.push([di, dj]);
+    if (!offs.length) offs.push([0, 0]);
+    let done = 0;
+
+    function step(n) {
+      const end = Math.min(runs, done + n);
+      for (let r = done; r < end; r++) {
+        const hit = new Uint8Array(targets.length);
+        const mark = (c, s) => {
+          if (seenRun[c] === r) return; seenRun[c] = r;
+          count[c]++;
+          if (first[c] < 0 || s < first[c]) first[c] = s;
+          for (let t = 0; t < targets.length; t++) if (targets[t].mask[c]) hit[t] = 1;
+        };
+        const res = descend(h, w, ht, vent, r, dh, seed, cellTrue, maxLen, maxPond, (c, s) => {
+          const ci = c % w, cj = (c / w) | 0;
+          for (const [di, dj] of offs) {
+            const ni = ci + di, nj = cj + dj;
+            if (ni < 0 || nj < 0 || ni >= w || nj >= ht) continue;
+            const n = nj * w + ni;
+            if (h[n] > 0) mark(n, s);                  // footprint doesn't spread onto the sea
+          }
+        }, stopElev);
+        for (let t = 0; t < targets.length; t++) targets[t].hits += hit[t];
+        lengths.push(res.length); reasons[res.reason]++;
+      }
+      done = end;
+      return done;
+    }
+
+    function result() {
+      const best = [];
+      const bestRes = descend(h, w, ht, vent, 0, 0, seed, cellTrue, maxLen, maxPond, (c, s, pond) => { if (!pond) best.push(c); }, stopElev);
+      const L = lengths.slice().sort((a, b) => a - b);
+      let covered = 0; for (let i = 0; i < N; i++) if (count[i] > 0) covered++;
+      return {
+        count, first, runs: done,
+        bestPath: best, bestPathLength: bestRes.length, bestPonds: bestRes.ponds, bestReason: bestRes.reason,
+        medianLength: L[L.length >> 1] || 0, maxLength: L[L.length - 1] || 0,
+        reasons, coveredCells: covered,
+        targets: targets.map(t => ({ name: t.name, hits: t.hits, fraction: done ? t.hits / done : 0 }))
+      };
+    }
+    return { step, result, get done() { return done; }, runs };
+  }
+
+  function run(opts) { const r = createRunner(opts); r.step(r.runs); return r.result(); }
+
+  const api = { run, createRunner, descend, fillHollow, noise };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.LavaModel = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { USDZExporter } from "three/addons/exporters/USDZExporter.js";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "three/addons/libs/fflate.module.js";
+
+// ---------------- Versions ----------------
+// App version on every release; a part's version goes up whenever its maths or data handling changes.
+const VERSION = "AR 0.1";
+const PARTS = [
+  ["App", VERSION.slice(3), "First lab version for iPhone and iPad: preview on the page, AR through Apple's AR viewer (AR Quick Look)."],
+  ["Terrain", "0.1", "Esri World Elevation (open Terrain Tiles if it can't load), every 120 m, heights × 1.5, Esri World Imagery draped on top, on a base with the credits along the front."],
+  ["Lava", "0.1", "Same lava model and settings as VR 0.15 (DOWNFLOW, 300 runs per flow, timed so the northern flow reaches San Sebastiano early on 21 March). Drawn in 60 m squares that rise out of the ground as the front passes, glow, then cool to a dark crust."],
+  ["Ash on the ground", "0.1", "Same ash pattern as VR 0.15 (east lobe 22 March, smaller south-west lobe 23–29 March), spreading downwind in bands."],
+  ["Fountains and column", "0.1", "Eight lava fountains up to about 4 km, then a column of about 6 km with a cloud drifting east, then smaller bursts blowing south-west."],
+  ["Signs and labels", "0.1", "Date and stage sign in front of the model, tilted back so it can be read from above; town labels."],
+  ["AR file", "0.1", "Built on the device as a USDZ file with three.js (r186), 24 frames a second, one loop."]
+];
+document.title = "Vesuvius 1944 in AR (" + VERSION + ", lab)";
+const $ = (id) => document.getElementById(id);
+$("verLine").textContent = "Version " + VERSION.slice(3) + ".";
+$("verTable").innerHTML = PARTS.map(([p, v, n]) => `<tr><th scope="row">${p}</th><td>${v}</td><td>${n}</td></tr>`).join("");
+const status = (t) => { $("status").textContent = t; };
+const LM = window.LavaModel;
+
+// ---------------- Area and grids (as the VR app) ----------------
+const AREA = { lonMin: 14.28, lonMax: 14.66, latMin: 40.70, latMax: 40.89 };
+const LON0 = (AREA.lonMin + AREA.lonMax) / 2, LAT0 = (AREA.latMin + AREA.latMax) / 2;
+const KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 111132;
+const toXY = (lon, lat) => [(lon - LON0) * KX, (lat - LAT0) * KY];
+const toLL = (x, y) => [LON0 + x / KX, LAT0 + y / KY];
+const XMIN = (AREA.lonMin - LON0) * KX, XMAX = (AREA.lonMax - LON0) * KX, YMIN = (AREA.latMin - LAT0) * KY, YMAX = (AREA.latMax - LAT0) * KY;
+const CELL = 30;
+const W = Math.floor((XMAX - XMIN) / CELL), H = Math.floor((YMAX - YMIN) / CELL);
+const cellXY = (c) => [XMIN + (c % W + 0.5) * CELL, YMAX - (((c / W) | 0) + 0.5) * CELL];
+const idxOf = (lon, lat) => { const [x, y] = toXY(lon, lat); const i = Math.floor((x - XMIN) / CELL), j = Math.floor((YMAX - y) / CELL); return (i < 0 || j < 0 || i >= W || j >= H) ? -1 : j * W + i; };
+
+const CRATER = { lon: 14.4269, lat: 40.8211 };
+const FLOWS = { north: { lon: 14.4269, lat: 40.8252, stop: 140 }, southeast: { lon: 14.4307, lat: 40.8182, stop: 350 } };
+const TOWNS = [
+  ["San Sebastiano", 14.3704, 40.8418], ["Massa di Somma", 14.3753, 40.8483], ["Ercolano", 14.3474, 40.8059],
+  ["Torre del Greco", 14.3657, 40.7867], ["Boscotrecase", 14.4611, 40.7744], ["Terzigno", 14.4936, 40.8092],
+  ["Poggiomarino", 14.5406, 40.8021], ["Pompei", 14.4990, 40.7489], ["Scafati", 14.5284, 40.7489],
+  ["Angri", 14.5695, 40.7446], ["Nocera Inferiore", 14.6417, 40.7442]
+];
+// Timeline in hours from 00:00 on 18 March 1944 (INGV Osservatorio Vesuviano), and the same playback pacing as the VR app
+const T = { start: 16.5, fountains: 3 * 24 + 17, column: 4 * 24 + 14, phase4: 5 * 24 + 12, end: 12 * 24, townArrival: 3 * 24 + 6 };
+const SEG = [[T.start, T.fountains, 26], [T.fountains, T.column, 10], [T.column, T.phase4, 12], [T.phase4, T.end, 12]];
+const PLAY_S = SEG.reduce((s, g) => s + g[2], 0);
+function hoursAt(sec) { let s = sec; for (const [a, b, d] of SEG) { if (s <= d) return a + (b - a) * s / d; s -= d; } return T.end; }
+function secAt(hours) { let s = 0; for (const [a, b, d] of SEG) { if (hours <= b) return s + d * Math.max(0, hours - a) / (b - a); s += d; } return PLAY_S; }
+// The AR loop: 2 s before the lava starts, the eruption, 4 s at the end
+const LEAD = 2, TAIL = 4, LOOP = LEAD + PLAY_S + TAIL;
+const arT = (h) => LEAD + secAt(h);
+const hoursAtAR = (t) => t <= LEAD ? T.start : hoursAt(Math.min(PLAY_S, t - LEAD));
+function fmtDate(h) { const day = 18 + Math.floor(h / 24), hh = Math.floor(h % 24), mm = Math.floor((h % 1) * 60 / 10) * 10;
+  return `${day} March 1944, ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; }
+const PHASE_TEXT = {
+  0: "The model is ready. Press Play, or open it in AR.",
+  1: "<b>Lava flows.</b> Two flows left the crater. One went south-east. The other went north, was turned west by Monte Somma and moved at 50–300 m an hour towards San Sebastiano and Massa di Somma.",
+  2: "<b>Lava fountains.</b> Eight fountains of lava, one after another. Material was thrown up to about 4 km.",
+  3: "<b>Explosions.</b> An eruption column more than 5 km high. The wind carried ash 15–20 km east over Terzigno, Pompei, Scafati, Angri, Nocera, Poggiomarino and Cava.",
+  4: "<b>Smaller explosions.</b> Ash plumes blew to the south-west, until the eruption ended on 29 March.",
+  5: "<b>The end of the eruption.</b> Vesuvius has not erupted since. It is dormant, not extinct."
+};
+const phaseOf = (h) => h < T.start ? 0 : h < T.fountains ? 1 : h < T.column ? 2 : h < T.phase4 ? 3 : h < T.end ? 4 : 5;
+
+// ---------------- Tiles (as the VR app) ----------------
+const tileXY = (lon, lat, z) => { const n = 2 ** z; const x = (lon + 180) / 360 * n;
+  const lr = lat * Math.PI / 180, y = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n; return [x, y]; };
+function loadImage(url) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => rej(new Error("image " + url)); im.src = url; }); }
+const ELEV_Z = 13;
+async function loadElevation(progress) {
+  const [x0f, y0f] = tileXY(AREA.lonMin, AREA.latMax, ELEV_Z), [x1f, y1f] = tileXY(AREA.lonMax, AREA.latMin, ELEV_Z);
+  const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
+  const tiles = new Map(), total = (tx1 - tx0 + 1) * (ty1 - ty0 + 1); let done = 0, esriOK = true; const used = new Set();
+  let Lerc = null;
+  try { Lerc = await import("lerc"); await Lerc.load(); } catch (e) { console.warn("LERC decoder unavailable; using open terrain tiles", e); esriOK = false; }
+  const esriTile = async (tx, ty) => {
+    const r = await fetch(`https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/${ELEV_Z}/${ty}/${tx}`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const pb = Lerc.decode(await r.arrayBuffer());
+    return { w: pb.width, h: pb.height, v: pb.pixels[0], corner: pb.width === 257 };
+  };
+  const terrariumTile = async (tx, ty) => {
+    const im = await loadImage(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${ELEV_Z}/${tx}/${ty}.png`);
+    const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height;
+    const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(im, 0, 0);
+    const d = cx.getImageData(0, 0, im.width, im.height).data, v = new Float32Array(im.width * im.height);
+    for (let k = 0; k < v.length; k++) v[k] = d[4 * k] * 256 + d[4 * k + 1] + d[4 * k + 2] / 256 - 32768;
+    return { w: im.width, h: im.height, v, corner: false };
+  };
+  const jobs = [];
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) jobs.push((async () => {
+    let t = null;
+    if (esriOK) { try { t = await esriTile(tx, ty); used.add("esri"); } catch (e) { console.warn("Esri elevation tile failed; using open terrain tile", tx, ty, e.message); } }
+    if (!t) { t = await terrariumTile(tx, ty); used.add("terrarium"); }
+    tiles.set(tx + "," + ty, t); progress(++done / total);
+  })());
+  await Promise.all(jobs);
+  const source = used.has("terrarium") ? (used.has("esri") ? "mixed" : "terrarium") : "esri";
+  const at = (lon, lat) => {
+    const [fx, fy] = tileXY(lon, lat, ELEV_Z), tx = Math.floor(fx), ty = Math.floor(fy), t = tiles.get(tx + "," + ty);
+    if (!t) return NaN;
+    const u = fx - tx, v = fy - ty;
+    const px = t.corner ? u * (t.w - 1) : u * t.w - 0.5, py = t.corner ? v * (t.h - 1) : v * t.h - 0.5;
+    const i = Math.max(0, Math.min(t.w - 2, Math.floor(px))), j = Math.max(0, Math.min(t.h - 2, Math.floor(py)));
+    const a = Math.min(1, Math.max(0, px - i)), b = Math.min(1, Math.max(0, py - j)), q = j * t.w + i;
+    return t.v[q] * (1 - a) * (1 - b) + t.v[q + 1] * a * (1 - b) + t.v[q + t.w] * (1 - a) * b + t.v[q + t.w + 1] * a * b;
+  };
+  const h = new Float32Array(W * H);
+  for (let c = 0; c < W * H; c++) { const [lon, lat] = toLL(...cellXY(c)); const z = at(lon, lat); h[c] = isFinite(z) ? Math.max(0, z) : 0; }
+  return { h, source };
+}
+// Imagery at zoom 13: about 2300 px across, which the AR file keeps at up to 2048 px
+async function loadImagery(progress) {
+  const z = 13;
+  const [x0f, y0f] = tileXY(AREA.lonMin, AREA.latMax, z), [x1f, y1f] = tileXY(AREA.lonMax, AREA.latMin, z);
+  const tx0 = Math.floor(x0f), tx1 = Math.floor(x1f), ty0 = Math.floor(y0f), ty1 = Math.floor(y1f);
+  const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256;
+  const cx = cv.getContext("2d"); cx.fillStyle = "#5d6b52"; cx.fillRect(0, 0, cv.width, cv.height);
+  const jobs = []; let done = 0; const total = (tx1 - tx0 + 1) * (ty1 - ty0 + 1);
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++)
+    jobs.push(loadImage(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`)
+      .then(im => cx.drawImage(im, (tx - tx0) * 256, (ty - ty0) * 256)).catch(() => {}).finally(() => progress(++done / total)));
+  await Promise.all(jobs);
+  const uvOf = (lon, lat) => { const [fx, fy] = tileXY(lon, lat, z); return [(fx - tx0) / (tx1 - tx0 + 1), (fy - ty0) / (ty1 - ty0 + 1)]; };
+  return { canvas: cv, uvOf, zoom: z };
+}
+
+// ---------------- Lava (same model and settings as VR 0.15) ----------------
+const lava = { cells: [], arr: null, speed: 0, townReached: null };
+async function runLava(hgt, progress) {
+  const dist = new Float32Array(W * H).fill(Infinity), mask = new Uint8Array(W * H);
+  let k = 0;
+  for (const f of Object.values(FLOWS)) {
+    const vent = idxOf(f.lon, f.lat);
+    const runner = LM.createRunner({ h: hgt, w: W, ht: H, cellTrue: CELL, vent, runs: 300, dh: 3, maxLen: 10000, seed: 1944, stopElev: f.stop, width: 200,
+      maxPond: Math.round(30000 * 400 / (CELL * CELL)) });
+    while (runner.done < runner.runs) { runner.step(25); progress((k + runner.done / runner.runs) / 2); await new Promise(r => setTimeout(r, 0)); }
+    const res = runner.result();
+    for (let c = 0; c < W * H; c++) if (res.count[c] / res.runs >= 0.2) { mask[c] = 1; const d = Math.max(0, res.first[c]) * CELL * 1.2; if (d < dist[c]) dist[c] = d; }
+    k++;
+  }
+  const ss = TOWNS[0], ssCell = idxOf(ss[1], ss[2]); let dSS = Infinity;
+  { const i0 = ssCell % W, j0 = (ssCell / W) | 0, rr = Math.round(400 / CELL);
+    for (let dj = -rr; dj <= rr; dj++) for (let di = -rr; di <= rr; di++) { const q = (j0 + dj) * W + i0 + di; if (q >= 0 && q < W * H && dist[q] < dSS) dSS = dist[q]; } }
+  lava.speed = isFinite(dSS) ? dSS / (T.townArrival - T.start) : 85;
+  lava.townReached = isFinite(dSS);
+  const arr = new Float32Array(W * H).fill(Infinity);
+  for (let c = 0; c < W * H; c++) if (mask[c] && isFinite(dist[c])) { arr[c] = T.start + dist[c] / lava.speed; lava.cells.push(c); }
+  lava.arr = arr;
+}
+
+// ---------------- The model on the table ----------------
+// Table coordinates in metres: x east, y up, z south. Quick Look puts it on a real surface at this size (pinch to change it).
+const MODEL_W = 0.6, EXAG = 1.5, HBASE = -50, PLINTH = 0.016;
+const SCALE = MODEL_W / (XMAX - XMIN), VS = SCALE * EXAG;
+const tp = (x, y, z) => [x * SCALE, (z - HBASE) * VS, -y * SCALE];
+const RS = 4;                                                  // terrain mesh every 4th cell (120 m)
+const RW = Math.floor((W - 1) / RS) + 1, RH = Math.floor((H - 1) / RS) + 1;
+const root = new THREE.Group(); root.name = "Vesuvius1944";
+const tracks = [];
+const HIDE_S = 1e-4;                                           // "hidden" scale (0 would make a singular matrix)
+
+// keyframes helper: strictly increasing times
+function keys(list) { const t = [], v = []; let last = -1; for (const [time, val] of list) { const tt = Math.max(time, last + 1e-3); t.push(tt); v.push(...val); last = tt; } return [t, v]; }
+function animate(obj, prop, list) { const [t, v] = keys(list); tracks.push(new THREE.VectorKeyframeTrack(obj.name + "." + prop, t, v)); }
+
+let hgt = null, Hg = null;
+function surfH(x, y) {          // height of the terrain mesh as drawn (same triangles), so things laid on it sit on it
+  const fx = ((x - XMIN) / CELL - 0.5) / RS, fy = ((YMAX - y) / CELL - 0.5) / RS;
+  const ri = Math.max(0, Math.min(RW - 2, Math.floor(fx))), rj = Math.max(0, Math.min(RH - 2, Math.floor(fy)));
+  const u = Math.min(1, Math.max(0, fx - ri)), v = Math.min(1, Math.max(0, fy - rj));
+  const a = Hg[rj * RW + ri], b = Hg[rj * RW + ri + 1], c = Hg[(rj + 1) * RW + ri], d = Hg[(rj + 1) * RW + ri + 1];
+  return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v);
+}
+const vx = (ri) => XMIN + (ri * RS + 0.5) * CELL, vy = (rj) => YMAX - (rj * RS + 0.5) * CELL;
+let bounds = null;
+
+function textCanvas(lines, opt = {}) {
+  const pad = opt.pad ?? 24, fonts = opt.fonts, cv = document.createElement("canvas"), cx = cv.getContext("2d");
+  const widths = lines.map((l, i) => { cx.font = fonts[i]; return cx.measureText(l).width; });
+  cv.width = opt.width ?? Math.ceil(Math.max(...widths) + pad * 2); cv.height = opt.height;
+  cx.fillStyle = opt.bg ?? "rgba(20,18,16,0.92)";
+  const r = opt.radius ?? 18; cx.beginPath(); cx.roundRect(0, 0, cv.width, cv.height, r); cx.fill();
+  const lh = cv.height / lines.length;
+  lines.forEach((l, i) => { cx.font = fonts[i]; cx.fillStyle = opt.colors?.[i] ?? "#fff"; cx.textBaseline = "middle";
+    const w = cx.measureText(l).width, x = opt.align === "left" ? pad : (cv.width - Math.min(w, cv.width - 2 * pad)) / 2;
+    cx.fillText(l, x, lh * (i + 0.5), cv.width - 2 * pad); });
+  return cv;
+}
+const canvasTex = (cv, jpeg) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; if (jpeg) t.userData.mimeType = "image/jpeg"; return t; };
+const std = (o) => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.95, metalness: 0 }, o));
+function mesh(name, geo, mat, parent = root) { const m = new THREE.Mesh(geo, mat); m.name = name; parent.add(m); return m; }
+function geom(pos, idx, uv) { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  if (uv) g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g; }
+
+function buildTerrain(img, elevSource) {
+  Hg = new Float32Array(RW * RH);
+  const pos = [], uv = [], idx = [];
+  for (let rj = 0; rj < RH; rj++) for (let ri = 0; ri < RW; ri++) {
+    const i = ri * RS, j = rj * RS, h = hgt[j * W + i]; Hg[rj * RW + ri] = h;
+    const x = vx(ri), y = vy(rj), [lon, lat] = toLL(x, y), [u, v] = img.uvOf(lon, lat);
+    pos.push(...tp(x, y, h)); uv.push(u, 1 - v);
+  }
+  for (let rj = 0; rj < RH - 1; rj++) for (let ri = 0; ri < RW - 1; ri++) { const a = rj * RW + ri, b = a + 1, c = a + RW, d = c + 1; idx.push(a, c, b, b, c, d); }
+  mesh("terrain", geom(pos, idx, uv), std({ map: canvasTex(img.canvas, true) }));
+  const x0 = vx(0) * SCALE, x1 = vx(RW - 1) * SCALE, z0 = -vy(0) * SCALE, z1 = -vy(RH - 1) * SCALE;
+  bounds = { x0, x1, z0, z1 };
+  // sides down to the base (both ways round, so they show from inside and out)
+  const sp = [], si = [];
+  const edge = (list) => { const s = sp.length / 3; list.forEach(([ri, rj]) => { const [x, yy, z] = tp(vx(ri), vy(rj), Hg[rj * RW + ri]); sp.push(x, yy, z, x, 0, z); });
+    for (let m = 0; m < list.length - 1; m++) { const a = s + m * 2; si.push(a, a + 1, a + 2, a + 2, a + 1, a + 3, a, a + 2, a + 1, a + 2, a + 3, a + 1); } };
+  const top = [], bottom = [], left = [], right = [];
+  for (let ri = 0; ri < RW; ri++) { top.push([ri, 0]); bottom.push([ri, RH - 1]); }
+  for (let rj = 0; rj < RH; rj++) { left.push([0, rj]); right.push([RW - 1, rj]); }
+  [top, right, bottom, left].forEach(edge);
+  mesh("sides", geom(sp, si), std({ color: 0x5b4a3a }));
+  // the base, with the credits along the front so they travel with the model
+  const base = mesh("base", new THREE.BoxGeometry(x1 - x0, PLINTH, z1 - z0), std({ color: 0x2a2622 }));
+  base.position.set((x0 + x1) / 2, -PLINTH / 2, (z0 + z1) / 2);
+  const elev = { esri: "Esri World Elevation", terrarium: "Terrain Tiles (Mapzen, on AWS)", mixed: "Esri World Elevation and Terrain Tiles" }[elevSource];
+  const cw = x1 - x0 - 0.01, ch = PLINTH * 0.8, cv = textCanvas([
+    `Vesuvius, March 1944 · Imagery: Esri World Imagery (Esri, Vantor, Earthstar Geographics, and the GIS User Community) · Elevation: ${elev} · Heights × 1.5`,
+    `Lava: DOWNFLOW method (Favalli et al. 2005) · 1944 events: INGV Osservatorio Vesuviano · Created by Jason Sawle · Powered by Esri · ${VERSION}`],
+    { fonts: ["600 22px system-ui, sans-serif", "600 22px system-ui, sans-serif"], width: 2048, height: Math.round(2048 * ch / cw), radius: 0, bg: "#2a2622", colors: ["#ece8df", "#ece8df"] });
+  const cr = mesh("credits", new THREE.PlaneGeometry(cw, ch), std({ map: canvasTex(cv) }));
+  cr.position.set((x0 + x1) / 2, -PLINTH / 2, z1 + 0.0004);
+}
+
+// Lava: 60 m squares grouped by when the front reaches them. Each group rises out of the ground (hot), the crust forms
+// under it, and the hot layer sinks back below the crust as it cools.
+const LAVA_CRUST = 20, LAVA_HOT = 32, BIN_S = 0.5, HOT_H = 10;   // metres above the ground (illustrative), seconds per group, hours glowing
+function buildLava() {
+  const BW = Math.floor(W / 2), BH = Math.floor(H / 2), bins = new Map();
+  for (let bj = 0; bj < BH; bj++) for (let bi = 0; bi < BW; bi++) {
+    let a = Infinity;
+    for (let dj = 0; dj < 2; dj++) for (let di = 0; di < 2; di++) a = Math.min(a, lava.arr[(2 * bj + dj) * W + 2 * bi + di]);
+    if (!isFinite(a) || a >= T.end) continue;
+    const key = Math.floor(arT(a) / BIN_S);
+    if (!bins.has(key)) bins.set(key, []);
+    bins.get(key).push([bi, bj, a]);
+  }
+  const hotMat = std({ color: 0xff8a2a, emissive: 0xff4d00, emissiveIntensity: 1, roughness: 0.6 });
+  const crustMat = std({ color: 0x3d1d14 });
+  let n = 0, squares = 0;
+  for (const [key, blocks] of [...bins.entries()].sort((p, q) => p[0] - q[0])) {
+    const build = (off) => { const pos = [], idx = [], vmap = new Map(); let minY = Infinity;
+      const V = (ci, cj) => { const k = ci + "," + cj; if (vmap.has(k)) return vmap.get(k);
+        const x = XMIN + 2 * ci * CELL, y = YMAX - 2 * cj * CELL, p = tp(x, y, surfH(x, y) + off); minY = Math.min(minY, p[1]);
+        pos.push(...p); vmap.set(k, pos.length / 3 - 1); return pos.length / 3 - 1; };
+      for (const [bi, bj] of blocks) { const a = V(bi, bj), b = V(bi + 1, bj), c = V(bi, bj + 1), d = V(bi + 1, bj + 1); idx.push(a, c, b, b, c, d); }
+      return { g: geom(pos, idx), minY }; };
+    const t0 = Math.min(...blocks.map(b => arT(b[2]))), aMax = Math.max(...blocks.map(b => b[2]));
+    const crust = build(LAVA_CRUST), hot = build(LAVA_HOT);
+    const sink = Math.max(crust.minY - 0.0004, (LAVA_HOT + 15) * VS);       // far enough down to be under the ground, never below the base
+    const mc = mesh("lavaCrust" + n, crust.g, crustMat), mh = mesh("lavaHot" + n, hot.g, hotMat);
+    mc.position.y = mh.position.y = -sink;
+    const tc = arT(aMax + HOT_H), cool = -(LAVA_HOT - LAVA_CRUST + 6) * VS;
+    animate(mh, "position", [[0, [0, -sink, 0]], [t0, [0, -sink, 0]], [t0 + 0.4, [0, 0, 0]], [tc, [0, 0, 0]], [tc + 1.5, [0, cool, 0]], [LOOP, [0, cool, 0]]]);
+    animate(mc, "position", [[0, [0, -sink, 0]], [t0 + 0.3, [0, -sink, 0]], [t0 + 0.4, [0, 0, 0]], [LOOP, [0, 0, 0]]]);
+    n++; squares += blocks.length;
+  }
+  return { groups: n, squares };
+}
+
+// Ash on the ground: the VR app's two lobes, laid on the terrain, appearing in bands as the cloud moves downwind
+const ASH_AXIS_E = 112, ASH_AXIS_W = 225;
+function lobe(dx, dy, bearing, len, width0) { const b = bearing * Math.PI / 180, ax = Math.sin(b), ay = Math.cos(b);
+  const along = dx * ax + dy * ay, across = -dx * ay + dy * ax; if (along < -1500) return 0;
+  const sig = width0 + 0.35 * Math.max(0, along), f = Math.exp(-(across * across) / (2 * sig * sig));
+  return f * Math.min(1, (along + 1500) / 2500) * Math.exp(-Math.max(0, along) / len); }
+function buildAsh() {
+  const [cx, cy] = toXY(CRATER.lon, CRATER.lat), OFF = 12;
+  const lobes = [
+    { name: "ashEast", bearing: ASH_AXIS_E, len: 12000, w0: 2200, k: 1.29, t0: arT(T.column) + 1, step: 0.8 },
+    { name: "ashSouthWest", bearing: ASH_AXIS_W, len: 6000, w0: 1200, k: 0.7, t0: arT(T.phase4) + 0.5, step: 1.1 }];
+  let groups = 0;
+  for (const L of lobes) {
+    const AW = 384, AH = Math.round(AW * (RH - 1) / (RW - 1)), cv = document.createElement("canvas"); cv.width = AW; cv.height = AH;
+    const cx2 = cv.getContext("2d"), im = cx2.createImageData(AW, AH);
+    const val = (x, y) => surfH(x, y) <= 0.5 ? 0 : Math.min(1, L.k * lobe(x - cx, y - cy, L.bearing, L.len, L.w0)) * 0.9;
+    for (let j = 0; j < AH; j++) for (let i = 0; i < AW; i++) {
+      const x = vx(0) + (i + 0.5) / AW * (vx(RW - 1) - vx(0)), y = vy(0) + (j + 0.5) / AH * (vy(RH - 1) - vy(0)), o = (j * AW + i) * 4;
+      im.data[o] = 150; im.data[o + 1] = 145; im.data[o + 2] = 138; im.data[o + 3] = Math.round(255 * val(x, y));
+    }
+    cx2.putImageData(im, 0, 0);
+    const mat = std({ map: canvasTex(cv), transparent: true, depthWrite: false });
+    // triangles of the terrain grid where there is ash, split into bands by distance downwind
+    const b = L.bearing * Math.PI / 180, ax = Math.sin(b), ay = Math.cos(b), BAND = 2500, bands = new Map();
+    const vval = new Float32Array(RW * RH); for (let rj = 0; rj < RH; rj++) for (let ri = 0; ri < RW; ri++) vval[rj * RW + ri] = val(vx(ri), vy(rj));
+    for (let rj = 0; rj < RH - 1; rj++) for (let ri = 0; ri < RW - 1; ri++) {
+      const a = rj * RW + ri, q = [a, a + RW, a + 1, a + 1, a + RW, a + RW + 1];
+      for (let t = 0; t < 2; t++) { const tri = q.slice(t * 3, t * 3 + 3); if (Math.max(...tri.map(k => vval[k])) < 0.03) continue;
+        const mx = tri.reduce((s, k) => s + vx(k % RW), 0) / 3 - cx, my = tri.reduce((s, k) => s + vy((k / RW) | 0), 0) / 3 - cy;
+        const band = Math.max(0, Math.floor((mx * ax + my * ay + 1500) / BAND)); if (!bands.has(band)) bands.set(band, []); bands.get(band).push(...tri); }
+    }
+    for (const [band, tri] of bands) {
+      const pos = [], uv = [], map = new Map(), idx = [];
+      for (const k of tri) { if (!map.has(k)) { const ri = k % RW, rj = (k / RW) | 0; pos.push(...tp(vx(ri), vy(rj), Hg[k] + OFF)); uv.push(ri / (RW - 1), 1 - rj / (RH - 1)); map.set(k, pos.length / 3 - 1); } idx.push(map.get(k)); }
+      const m = mesh(L.name + band, geom(pos, idx, uv), mat), sink = (OFF + 400) * VS; m.renderOrder = 2;
+      const t = L.t0 + band * L.step;
+      animate(m, "position", [[0, [0, -sink, 0]], [t, [0, -sink, 0]], [t + 0.8, [0, 0, 0]], [LOOP, [0, 0, 0]]]);
+      groups++;
+    }
+  }
+  return groups;
+}
+
+// Fountains, eruption column and ash cloud
+function buildColumn(craterTop) {
+  const [cx, cy] = toXY(CRATER.lon, CRATER.lat), base = tp(cx, cy, craterTop);
+  const hidden = [HIDE_S, HIDE_S, HIDE_S];
+  // eight lava fountains, up to about 4 km
+  const fg = new THREE.ConeGeometry(1, 1, 20); fg.translate(0, 0.5, 0);
+  const ftn = mesh("fountains", fg, std({ color: 0xffa040, emissive: 0xff5a00, emissiveIntensity: 1, transparent: true, opacity: 0.85, roughness: 0.5 }));
+  ftn.position.set(...base); ftn.scale.set(...hidden);
+  const R = 450 * SCALE, HF = 4000 * VS, f0 = arT(T.fountains), f1 = arT(T.column), fk = [[0, hidden], [f0, hidden]];
+  for (let i = 0; i < 8; i++) { const a = f0 + (f1 - f0) * i / 8, d = (f1 - f0) / 8;
+    fk.push([a + 0.05 * d, [R * 0.5, HF * 0.15, R * 0.5]], [a + 0.45 * d, [R, HF, R]], [a + 0.9 * d, [R * 0.5, HF * 0.15, R * 0.5]]); }
+  fk.push([f1 + 0.3, hidden], [LOOP, hidden]); animate(ftn, "scale", fk);
+  // the column: about 6 km on 22 March, about 3 km with bursts from 23 March
+  const ashMat = std({ color: 0x77716a, transparent: true, opacity: 0.9, roughness: 1 });
+  const cg = new THREE.LatheGeometry([[0, 0], [0.3, 0], [0.34, 0.15], [0.42, 0.4], [0.55, 0.68], [0.8, 0.86], [1, 0.95], [0.75, 1.02], [0, 1.05]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+  const col = mesh("column", cg, ashMat); col.position.set(...base); col.scale.set(...hidden);
+  const RC = 1300 * SCALE, HC = 6000 * VS, c0 = arT(T.column), c1 = arT(T.phase4), c2 = arT(T.end);
+  const ck = [[0, hidden], [c0, hidden], [c0 + 1.5, [RC, HC, RC]], [c1, [RC, HC, RC]]];
+  for (let i = 0; i < 14; i++) { const a = c1 + (c2 - c1) * i / 14, d = (c2 - c1) / 14, s = 1 - 0.6 * i / 14;
+    ck.push([a + 0.2 * d, [RC * 0.35, HC * 0.08, RC * 0.35]], [a + 0.5 * d, [RC * 0.6 * s, HC * 0.5 * s, RC * 0.6 * s]], [a + 0.85 * d, [RC * 0.35, HC * 0.08, RC * 0.35]]); }
+  ck.push([c2 + 0.5, hidden], [LOOP, hidden]); animate(col, "scale", ck);
+  // the cloud: puffs leaving the top of the column and drifting downwind
+  const sg = new THREE.SphereGeometry(1, 18, 12);
+  const puff = (name, bearing, topM, start, life, dist, size) => {
+    const b = bearing * Math.PI / 180, p0 = tp(cx, cy, craterTop + topM), p1 = tp(cx + Math.sin(b) * dist, cy + Math.cos(b) * dist, craterTop + topM * 0.75);
+    const m = mesh(name, sg, ashMat); m.position.set(...p0); m.scale.set(...hidden);
+    const s0 = [size * 0.3 * SCALE, size * 0.15 * VS, size * 0.3 * SCALE], s1 = [size * SCALE, size * 0.32 * VS, size * SCALE];
+    animate(m, "position", [[0, p0], [start, p0], [start + life, p1], [LOOP, p1]]);
+    animate(m, "scale", [[0, hidden], [start, hidden], [start + 0.4, s0], [start + life * 0.8, s1], [start + life, hidden], [LOOP, hidden]]);
+  };
+  for (let i = 0; i < 8; i++) puff("cloudEast" + i, ASH_AXIS_E + (i % 3 - 1) * 8, 6000, c0 + 1.2 + i * 1.2, Math.min(7, c1 - (c0 + 1.2 + i * 1.2) + 0.5), 5000 + i * 1800, 2600 + i * 250);
+  for (let i = 0; i < 6; i++) puff("cloudSouthWest" + i, ASH_AXIS_W + (i % 2 ? 6 : -6), 3000, c1 + 0.6 + i * 1.9, 3.2, 3500 + i * 700, 1600);
+}
+
+// The sign behind the model and the town labels
+const SIGNS = () => [
+  [0, arT(T.start) - 0.01, "18 March 1944", "Vesuvius before the eruption"],
+  [arT(T.start), arT(T.townArrival), "18–21 March 1944", "Two lava flows leave the crater"],
+  [arT(T.townArrival), arT(T.fountains), "21 March 1944", "Lava reaches San Sebastiano"],
+  [arT(T.fountains), arT(T.column), "21–22 March 1944", "Eight fountains of lava, up to 4 km"],
+  [arT(T.column), arT(T.phase4), "22 March 1944", "Explosions: ash blows east"],
+  [arT(T.phase4), arT(T.end), "23–29 March 1944", "Smaller explosions: ash blows south-west"],
+  [arT(T.end), LOOP, "29 March 1944", "The eruption ends"]];
+function buildSigns() {
+  // in front of the model, tilted back like a lectern: it faces someone looking down at the table and the column can't hide it
+  const SW = 0.34, SH = 0.06, TILT = -0.3 * Math.PI, z = bounds.z1 + 0.03, y = -PLINTH + 0.5 * SH * Math.cos(TILT) + 0.0005, backMat = std({ color: 0x14120f });
+  SIGNS().forEach(([a, b, l1, l2], i) => {
+    const g = new THREE.Group(); g.name = "sign" + i; root.add(g); g.position.set(0, y, z); g.rotation.x = TILT;
+    const cv = textCanvas([l1, l2], { fonts: ["600 44px system-ui, sans-serif", "700 60px system-ui, sans-serif"], width: 1024, height: Math.round(1024 * SH / SW), colors: ["#ffcfb8", "#ffffff"] });
+    mesh("signFront" + i, new THREE.PlaneGeometry(SW, SH), std({ map: canvasTex(cv), roughness: 1 }), g);
+    const back = mesh("signBack" + i, new THREE.PlaneGeometry(SW, SH), backMat, g); back.rotation.y = Math.PI; back.position.z = -0.0005;
+    const shown = [1, 1, 1], hidden = [HIDE_S, HIDE_S, HIDE_S], k = [[0, a > 0 ? hidden : shown]];
+    if (a > 0) k.push([a, hidden], [a + 0.25, shown]);
+    if (b < LOOP) k.push([b, shown], [b + 0.25, hidden]);
+    k.push([LOOP, b < LOOP ? hidden : shown]);
+    g.scale.set(...(a > 0 ? hidden : shown)); animate(g, "scale", k);
+  });
+  const labels = [["Vesuvius crater", CRATER.lon, CRATER.lat], ...TOWNS], postMat = std({ color: 0x14120f });
+  labels.forEach(([name, lon, lat], i) => {
+    const [x, y] = toXY(lon, lat), p = tp(x, y, surfH(x, y)), LH = 0.009, rise = i === 0 ? 0.03 : name === "Massa di Somma" ? 0.024 : 0.012;
+    const cv = textCanvas([name], { fonts: ["700 52px system-ui, sans-serif"], height: 80, radius: 14 });
+    const lw = LH * cv.width / cv.height;
+    const lab = mesh("label" + i, new THREE.PlaneGeometry(lw, LH), std({ map: canvasTex(cv), roughness: 1 })); lab.position.set(p[0], p[1] + rise + LH / 2, p[2]);
+    const post = mesh("post" + i, new THREE.BoxGeometry(0.0006, rise, 0.0006), postMat); post.position.set(p[0], p[1] + rise / 2, p[2]);
+  });
+}
+
+// ---------------- Preview (three.js, the same objects and animation as the AR file) ----------------
+const canvas = $("three");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1c1b19);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 20);
+camera.position.set(0, 0.42, 0.62);
+const controls = new OrbitControls(camera, canvas); controls.target.set(0, 0.02, -0.02); controls.enableDamping = true;
+controls.minDistance = 0.12; controls.maxDistance = 2.5; controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0x40382e, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-0.6, 1.2, 0.4); scene.add(sun);
+scene.add(root);
+function resize() { const r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix(); fitCamera(); }
+let userMoved = false; controls.addEventListener("start", () => { userMoved = true; });
+function fitCamera() {   // whole table across the width, room for the column above; only until the user turns the model
+  if (userMoved) return;
+  const vh = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), hh = vh * camera.aspect;
+  const d = Math.max(0.34 / hh + 0.2, 0.2 / vh + 0.15), dir = new THREE.Vector3(0, 0.62, 0.78).normalize();
+  controls.target.set(0, 0.06, 0); camera.position.copy(controls.target).addScaledVector(dir, d); controls.update();
+}
+new ResizeObserver(resize).observe(canvas); resize();
+// keyboard: arrows turn and tilt, + and - zoom
+canvas.addEventListener("keydown", (e) => { userMoved = true;
+  const off = camera.position.clone().sub(controls.target), s = new THREE.Spherical().setFromVector3(off), step = Math.PI / 18;
+  if (e.key === "ArrowLeft") s.theta -= step; else if (e.key === "ArrowRight") s.theta += step;
+  else if (e.key === "ArrowUp") s.phi = Math.max(0.15, s.phi - step); else if (e.key === "ArrowDown") s.phi = Math.min(Math.PI * 0.49, s.phi + step);
+  else if (e.key === "+" || e.key === "=") s.radius = Math.max(controls.minDistance, s.radius * 0.85); else if (e.key === "-") s.radius = Math.min(controls.maxDistance, s.radius / 0.85);
+  else return;
+  e.preventDefault(); camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(s)); controls.update();
+});
+
+let mixer = null, clip = null;
+const pb = { t: 0, playing: false, last: 0, phase: -1 };
+function showTime() {
+  const h = Math.min(hoursAtAR(pb.t), T.end - 1 / 6), ph = pb.t >= LEAD + PLAY_S ? 5 : (pb.t < LEAD ? 0 : phaseOf(h));
+  $("date").textContent = fmtDate(h); $("scrub").value = String(Math.round(pb.t / LOOP * 1000)); $("scrub").setAttribute("aria-valuetext", fmtDate(h));
+  if (ph !== pb.phase) { pb.phase = ph; $("stageText").innerHTML = PHASE_TEXT[ph]; }
+}
+function setPlaying(v) { pb.playing = v; $("play").innerHTML = v ? '<span aria-hidden="true">❚❚ </span>Pause' : '<span aria-hidden="true">▶ </span>Play'; }
+$("play").onclick = () => { if (!pb.playing && pb.t >= LOOP - 0.05) setT(0); setPlaying(!pb.playing); };
+$("restart").onclick = () => { setT(0); setPlaying(true); };
+const setT = (t) => { pb.t = t; if (mixer) mixer.setTime(Math.min(t, LOOP - 1e-3)); showTime(); };
+$("scrub").oninput = (e) => setT(e.target.value / 1000 * LOOP);
+renderer.setAnimationLoop((now) => {
+  const dt = Math.min(0.1, (now - (pb.last || now)) / 1000); pb.last = now;
+  if (mixer && pb.playing) { let t = pb.t + dt; if (t >= LOOP) { t = LOOP; setPlaying(false); } setT(t); }
+  controls.update(); renderer.render(scene, camera);
+});
+
+// ---------------- Load, build, write the AR file ----------------
+// The AR button is a picture (Safari opens AR only when the link holds a single image): the model on the left, the words on the right
+function arButton(label, shot) {
+  const cv = document.createElement("canvas"), k = 2; cv.width = 260 * k; cv.height = 64 * k; const cx = cv.getContext("2d"); cx.scale(k, k);
+  cx.fillStyle = "#b4381c"; cx.beginPath(); cx.roundRect(0, 0, 260, 64, 12); cx.fill();
+  cx.fillStyle = "#2b2823"; cx.beginPath(); cx.roundRect(8, 8, 76, 48, 7); cx.fill();
+  if (shot) { cx.save(); cx.beginPath(); cx.roundRect(8, 8, 76, 48, 7); cx.clip(); const s = Math.max(76 / shot.width, 48 / shot.height);
+    cx.drawImage(shot, 46 - shot.width * s / 2, 32 - shot.height * s / 2, shot.width * s, shot.height * s); cx.restore(); }
+  cx.fillStyle = "#fff"; cx.font = "700 19px system-ui, -apple-system, sans-serif"; cx.textBaseline = "middle"; cx.fillText(label, 98, 33, 154);
+  $("arImg").src = cv.toDataURL("image/png"); $("arImg").alt = label === "View in AR" ? "View in AR" : "View in AR (" + label.toLowerCase() + ")";
+}
+arButton("Preparing…");
+const arSupported = document.createElement("a").relList.supports("ar");
+if (!arSupported) { $("arArea").hidden = true; $("noAr").hidden = false; }
+let usdz = null;
+(async () => {
+  try {
+    const [el, img] = await Promise.all([
+      loadElevation(f => status(`Loading the volcano… ${Math.round(f * 100)}%`)),
+      loadImagery(() => {})
+    ]);
+    hgt = el.h;
+    buildTerrain(img, el.source);
+    status("Working out where the lava goes… 0%");
+    await runLava(hgt, f => status(`Working out where the lava goes… ${Math.round(f * 100)}%`));
+    const lv = buildLava(), ashGroups = buildAsh();
+    let top = 0; { const c0 = idxOf(CRATER.lon, CRATER.lat), i0 = c0 % W, j0 = (c0 / W) | 0, r = Math.round(400 / CELL);
+      for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) top = Math.max(top, hgt[(j0 + dj) * W + i0 + di]); }
+    buildColumn(top); buildSigns();
+    clip = new THREE.AnimationClip("eruption", LOOP, tracks);
+    mixer = new THREE.AnimationMixer(root); const act = mixer.clipAction(clip); act.setLoop(THREE.LoopOnce); act.clampWhenFinished = true; act.play(); mixer.setTime(0);
+    for (const id of ["play", "restart", "scrub"]) $(id).disabled = false;
+    pb.t = 0; showTime();
+    $("loopS").textContent = String(Math.round(LOOP));
+    $("whatList").innerHTML = SIGNS().map(([a, b, l1, l2]) => `<li><b>${Math.round(a)}–${Math.round(b)} s:</b> ${l1}. ${l2}.</li>`).join("");
+    const ESRI_ELEV = "Esri World Elevation. Sources: Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, GEBCO, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen and the GIS User Community";
+    const TERRAIN_TILES = "Terrain Tiles (Mapzen, on AWS): produced using Copernicus data and information funded by the European Union, EU-DEM layers; SRTM and GMTED2010 data courtesy of the U.S. Geological Survey";
+    $("credits").textContent = `Elevation: ${{ esri: ESRI_ELEV, terrarium: TERRAIN_TILES, mixed: ESRI_ELEV + ". " + TERRAIN_TILES }[el.source]}. Imagery: Esri World Imagery. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Lava: DOWNFLOW method (Favalli et al. 2005). Code: three.js (MIT licence), LERC (Apache 2.0). ${VERSION}`;
+    // a picture of the model for the AR button
+    renderer.render(scene, camera); const shot = document.createElement("canvas"); shot.width = canvas.width; shot.height = canvas.height; shot.getContext("2d").drawImage(canvas, 0, 0);
+    arButton("Preparing…", shot);
+    status("Preparing the AR model…");
+    await new Promise(r => setTimeout(r, 30));
+    root.updateMatrixWorld(true);
+    const buf = await new USDZExporter().parseAsync(root, { quickLookCompatible: true, maxTextureSize: 2048, animations: [clip], animationFrameRate: 24,
+      ar: { anchoring: { type: "plane" }, planeAnchoring: { alignment: "horizontal" } } });
+    setT(pb.t);
+    usdz = slim(buf);
+    const url = URL.createObjectURL(new Blob([usdz], { type: "model/vnd.usdz+zip" }));
+    // sharing from the AR viewer shares this page rather than the file
+    const link = $("arLink"); link.href = url + "#allowsContentScaling=1&canonicalWebPageURL=" + encodeURIComponent(location.href.split("#")[0]);
+    link.removeAttribute("aria-disabled"); arButton("View in AR", shot);
+    const mb = (usdz.byteLength / 1048576).toFixed(1);
+    status(arSupported ? `AR model ready (${mb} MB). Tap View in AR.` : `Model ready (AR file ${mb} MB).`);
+    console.info("Vesuvius AR", VERSION, { grid: [W, H], terrainGrid: [RW, RH], elevation: el.source, lavaCells: lava.cells.length, lavaGroups: lv.groups, lavaSquares: lv.squares,
+      ashGroups, tracks: tracks.length, speed_m_per_h: Math.round(lava.speed), townReached: lava.townReached, usdzMB: +mb });
+  } catch (e) { console.error(e); status("Couldn't build the model. Check your connection and reload."); }
+})();
+function slim(buf) {
+  const files = unzipSync(new Uint8Array(buf)), out = {};
+  const round = (m) => { const r = (+m).toFixed(5).replace(/\.?0+$/, ""); return r === "-0" ? "0" : r; };
+  for (const name of Object.keys(files)) {             // geometry numbers only; the first line ("#usda 1.0") stays as it is
+    if (!name.startsWith("geometries/")) { out[name] = files[name]; continue; }
+    const s = strFromU8(files[name]), nl = s.indexOf("\n");
+    out[name] = strToU8(s.slice(0, nl) + s.slice(nl).replace(/-?\d*\.\d+(?:e[-+]?\d+)?/g, round));
+  }
+  let offset = 0;                                  // same alignment as three.js's exporter
+  for (const name of Object.keys(out)) { const f = out[name]; offset += 34 + name.length; const m = offset & 63;
+    if (m !== 4) out[name] = [f, { extra: { 12345: new Uint8Array(64 - m) } }]; offset = f.length; }
+  const z = zipSync(out, { level: 0 }); return z.byteLength === z.buffer.byteLength ? z.buffer : z.slice().buffer;
+}
+$("arLink").addEventListener("click", (e) => { if (!usdz) e.preventDefault(); });
+// Test hooks (used by automated tests; harmless otherwise)
+window.__ar = { get usdz() { return usdz; }, get clip() { return clip; }, root, pb, LOOP, lava };
+</script>
+</body>
+</html>
